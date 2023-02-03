@@ -17,7 +17,7 @@ from parameters import gSize, nCommunities, \
 
 
 # Clean the outputs folder or make a new one if it doesn't exist
-def clean_outputs_folder():
+def clean_fldr():
     folder = path
     for filename in os.listdir(folder):
         file_path = os.path.join(folder, filename)
@@ -62,7 +62,7 @@ def find_cut(mG):
 
 
 # Select the indices of the edges across the border
-def choose_fn_indices(mG, faultyNodes, borderNodes):
+def choose_fn_idx(mG, faultyNodes, borderNodes):
     fn_copy = faultyNodes.copy()
     faultyNodesIdx = [[], []]  # TODO: rewrite it to account for more than two communities
     for i in range(nCommunities):
@@ -81,7 +81,7 @@ def choose_fn_indices(mG, faultyNodes, borderNodes):
 # Assign the faulty values to the nodes on the border
 def assign_values(mG, faultyNodes, faultyNodesIdx):
     mNu, gv, bv = [], [], []
-    S = []
+    S, Sgood = [], []
     for i in range(nCommunities):
         if i:
             indices = list(mG)[gSize[i - 1]:gSize[i] + gSize[i - 1]]
@@ -97,13 +97,14 @@ def assign_values(mG, faultyNodes, faultyNodesIdx):
         S1 = {faultyNodesIdx[i][f]: bv[-1][f] for f in range(len(bv[-1]))}
         S2 = {indices[g]: gv[-1][g] for g in range(len(gv[-1]))}
         S1.update(S2)
+        Sgood.append(S2)
 
         S.append(S1)
 
     attributes = {}
     [attributes.update(S[i]) for i in range(nCommunities)]
     nx.set_node_attributes(mG, attributes, 'Values')
-    return mNu, S, mG
+    return mNu, S, mG, Sgood
 
 
 # Display the graph
@@ -122,7 +123,7 @@ def display_graph(mG, rep, mString, path):
 
 
 # Define majority median
-def majority_median(v):
+def mMedian(v):
     v.sort()
     idx = math.ceil(len(v) / 2)
     if len(v) > 1:
@@ -132,19 +133,18 @@ def majority_median(v):
 
 
 # Calculates the potential as u = 1/2 \sum_{x \in V}\sum_{y in N_x}(\xi_y - \xi_x) = - 1/2 \Nabla \phi
-def calculate_community_potential(vals, mG, fnIdx):
+def get_comm_pot(vals, mG):
     pot = {}
     for i in range(nCommunities):
-        goodNodes = {j: vals[i][j] for j in vals[i].keys() if j not in fnIdx[i]}
-        sG = mG.subgraph(goodNodes.keys())
+        sG = mG.subgraph(list(vals[i].keys()))  # Obtain the community subgraph
         mL_comm = nx.laplacian_matrix(sG)
-        mVals = np.array(list(goodNodes.values()))
+        mVals = np.array([j for j in vals[i].values()])
         tmp = (-1) * np.dot(mL_comm.toarray(), mVals)
         pot[i] = np.array([round(i, 4) for i in tmp])
     return pot
 
 
-def calculate_global_potential(vals, mG, fnIdx):
+def get_glob_pot(vals, mG, fnIdx):
     goodNodes = {}
     for c in range(nCommunities):
         goodNodes.update({j: vals[c][j] for j in vals[c].keys() if j not in fnIdx[c]})
@@ -156,48 +156,48 @@ def calculate_global_potential(vals, mG, fnIdx):
     return pot
 
 
-# Main loop
-def main_loop(condition, values, badValIdx, mG):
-    global nodeAttributes, cp
+def main_loop_old(mG, values, goodValues, fn_indices, condition_list):
     t, counter = 1, 0
-    vals, bvi = values[0].copy(), badValIdx[0].copy()
-    for c in range(1, nCommunities):  # remove community partition in structures
-        bvi += badValIdx[c]
-        vals.update(values[c])
-    while any(condition) > 0.01 and counter < 30 * int(math.log(n)):  # and distanceChange > 0.001:
-        nodeAttributes = values.copy()
+    badValuesIdx = fn_indices[0]
+    for c in range(nCommunities):
+        badValuesIdx += fn_indices[c]
+    while any(condition_list) > 0.001 and counter < 30 * int(math.log(n)):  # and distanceChange > 0.001:
+        temp, nodeAttributes = values.copy(), {}
         for x in list(mG):
-            if x not in bvi:
+            neighVals = []
+            if x not in badValuesIdx:
                 neighbors = list(mG.adj[x])
-                neighVals = [vals[j] for j in neighbors]
-                med = majority_median(neighVals)
+                for c in range(nCommunities):
+                    neighVals += [values[c][j] for j in neighbors if j in values[c].keys()]
                 for c in range(nCommunities):
                     if x in values[c].keys():
-                        nodeAttributes[c].update({x: med})
-        values = copy.deepcopy(nodeAttributes)
-        tmp = nodeAttributes[0]
+                        med = majority_median(neighVals)
+                        temp[c].update({x: med})
+                        goodValues[c].update({x: med})
         for c in range(nCommunities):
-            tmp.update(nodeAttributes[c])
-        nodeAttributes = tmp
+            nodeAttributes.update(temp[c])
         nx.set_node_attributes(mG, nodeAttributes, 'Values')
         display_graph(mG, t, 'Graph_iter', path)
 
-        cp = calculate_community_potential(values, mG, badValIdx)
+        values = temp
 
-        condition = list(np.abs(cp[0]))
-        for c in range(1, nCommunities):
-            condition += list(np.abs(cp[c]))
+        # Update potentials
+        community_potential = calculate_community_potential(goodValues, mG)
+
+        condition_list = []
+        for c in range(nCommunities):
+            condition_list += list(np.abs(community_potential[c]))
 
         t += 1
         counter += 1
 
-    return cp, t, values
+        return community_potential, t, values
 
 
 def save_data(vals, mStr):
-    data = {'Comm 0': vals[0].values()}
+    data = {'Comm 0': [round(r, 4) for r in vals[0].values()]}
     for c in range(1, nCommunities):
-        data.update({f'Comm {c}': vals[c].values()})
+        data.update({f'Comm {c}': [round(r, 4) for r in vals[c].values()]})
     df = pd.DataFrame(data)
     # for c in range(1, nCommunities):
     #     mStr = f'Comm {c}'
