@@ -1,4 +1,3 @@
-import math
 import os
 import random
 import shutil
@@ -8,8 +7,9 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 
-from parameters import BORDER_NODES_OPTION, n, gSize, nCommunities, \
-    pQueryOracle, mu, mu_bad, thr, sigma, sigma_bad
+import parameters
+from parameters import gSize, nCommunities, \
+    mu, mu_bad, sigma, sigma_bad
 
 
 # Clean the outputs folder or make a new one if it doesn't exist
@@ -42,17 +42,31 @@ def generate_graph(commSize, pd, qd):
     return cG, minCut
 
 
+def find_cut(mG):
+    minDegree = min([i[1] for i in mG.degree])
+    partitionCut = []
+    for e in mG.edges:
+        if e[0] < parameters.n:
+            if e[1] >= parameters.n:
+                partitionCut.append(e)
+        else:
+            break
+    cutSize = len(partitionCut)
+    return partitionCut, cutSize, minDegree
+
+
 def choose_fn_indices(mG, faultyNodes, borderNodes):
+    fn_copy = faultyNodes.copy()
     faultyNodesIdx = [[], []]  # TODO: rewrite it to account for more than two communities
     for i in range(nCommunities):
         for j in borderNodes:
-            faultyNodesIdx[i] += j[i]  # TODO: rewrite it to account for more than two communities
-            faultyNodes[i] -= 1
-            if not faultyNodes[i]:
-                return
-        if faultyNodes[i]:
+            faultyNodesIdx[i] += [j[i]]  # TODO: rewrite it to account for more than two communities
+            fn_copy[i] -= 1
+            if not fn_copy[i]:
+                break
+        if fn_copy[i]:
             choices = [j for j in list(mG) if j not in faultyNodesIdx[i]]
-            faultyNodesIdx[i] += random.sample(choices, faultyNodes[i])
+            faultyNodesIdx[i] += random.sample(choices, fn_copy[i])
 
     return faultyNodesIdx
 

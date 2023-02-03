@@ -19,10 +19,9 @@ else:
 if STOCHASTIC_BLOCK_MODEL:  # G is generated through a stochastic block model
     probs = [[p, q], [q, p]]
     G = nx.stochastic_block_model([n, n], probs, seed=45)  # Generate graph
-    # Obtain the edges of the minimum cut
-    mc_edges = nx.minimum_edge_cut(G)
-    print(f'The minimum cut edges: {mc_edges}')
-    mc = len(mc_edges)
+    # Obtain the edges of the inter-blocks cut
+    mc_edges, mc, minDegree = func.find_cut(G)
+    print(f'The partition cut edges: {mc_edges}\nThe length: {mc}\nThe min degree: {minDegree}')
 else:  # G is the result of merging two regular graphs
     G, mc = func.generate_graph(n, p, q)
     mc_edges = {}  # TODO: Cristina Complete this part
@@ -31,27 +30,11 @@ tf = math.ceil(2 * n * 0.05)  # top faulty nodes
 print(f'The n of faulty nodes: {tf}')
 # p_fn = random.randint(0, tf - 1)
 fn = [int(tf / 2), int(tf / 2)]  # The faulty nodes per community
-redNodes = tf + int(0.8 * tf) * 1 / pQueryOracle  # The cmount of redundant nodes
+redNodes = math.ceil(tf + int(0.8 * tf) * 1 / pQueryOracle)  # The amount of redundant nodes
 
 # Initial step
 fn_indices = func.choose_fn_indices(G, fn, mc_edges)
 nu, values, G = func.assign_values(G, fn, fn_indices)
-
-
-# Display graph
-def display_graph(mG, rep, mString, path):
-    pos = nx.spring_layout(mG, seed=4)
-    attr = nx.get_node_attributes(mG, 'Values')
-    temp = {i: round(attr[i], 2) for i in attr.keys()}
-    colors = list(attr.values())
-    color_map = plt.get_cmap('GnBu')  # cm.GnBu
-    color_map = [color_map(1. * i / (sum(gSize))) for i in range((sum(gSize)))]
-    color_map = matplotlib.colors.ListedColormap(color_map, name='faulty_nodes_cm')
-    nx.draw(mG, pos=pos, node_color=colors, labels=temp, cmap=color_map, node_size=600)
-    mStr = mString + f'{rep}.png'
-    plt.savefig(path + mStr, format='png')
-    plt.close()
-
 
 func.display_graph(G, 0, 'Graph_iter', path)
 
