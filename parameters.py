@@ -1,7 +1,7 @@
 path = './Outputs/'
 BORDER_NODES_OPTION = 1
 STOCHASTIC_BLOCK_MODEL = 1
-n = 20
+n = 500
 gSize = [n, n]
 nCommunities = 2  # The number of communities
 p, q = 0.5, 0.01

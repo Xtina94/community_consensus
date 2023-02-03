@@ -26,8 +26,7 @@ if STOCHASTIC_BLOCK_MODEL:
     G = nx.stochastic_block_model([n, n], probs, seed=55)  # Generate graph
     mc_edges, mc, minDegree = fc.find_cut(G)  # Obtain the edges of the inter-blocks cut
 
-    print(f'The partition cut edges: {mc_edges}'
-          f'\nThe length of the cut: '
+    print(f'\nThe length of the cut: '
           f'{mc}'
           f'\nThe min degree: {minDegree}')
 else:
@@ -46,7 +45,7 @@ print(f'n of faulty nodes: {tf}'
 fn_indices = fc.choose_fn_idx(G, fn, mc_edges)
 nu, values, G, goodValues = fc.assign_values(G, fn, fn_indices)
 
-fc.display_graph(G, 0, 'Graph_iter', path)
+# fc.display_graph(G, 0, 'Graph_iter', path)
 
 "Calculate the initial median"
 median = [fc.mMedian(list(values[i].values())) for i in range(nCommunities)]
@@ -93,7 +92,7 @@ while any(condition) > 0.001 and counter < 30 * int(math.log(n)):  # and distanc
     for c in range(nCommunities):
         nodeAttr.update(temp[c])
     nx.set_node_attributes(G, nodeAttr, 'Values')
-    fc.display_graph(G, t, 'Graph_iter', path)
+    # fc.display_graph(G, t, 'Graph_iter', path)
 
     values = temp
 
@@ -137,7 +136,7 @@ for c in range(nCommunities):
     nodeAttr.update(valsOther[c])
 
 nx.set_node_attributes(otherG, nodeAttr, 'Values')
-fc.display_graph(otherG, tSecond, 'OtherCommunity_iter', path)
+# fc.display_graph(otherG, tSecond, 'OtherCommunity_iter', path)
 
 counter = 0
 while any(condition) > 0.001 and counter < 3 * int(math.log(n)):  # and distanceChange > 0.001:
@@ -153,9 +152,11 @@ while any(condition) > 0.001 and counter < 3 * int(math.log(n)):  # and distance
         condition += list(np.abs(community_potential[c]))
         nodeAttr.update(valsOther[c])
     nx.set_node_attributes(otherG, nodeAttr, 'Values')
-    fc.display_graph(otherG, tSecond, 'OtherCommunity_iter', path)
+    # fc.display_graph(otherG, tSecond, 'OtherCommunity_iter', path)
 
     tSecond += 1
     counter += 1
 
 fc.save_data(valsOther, 'Other Community Medians.csv')
+
+print('Data saved to file.')

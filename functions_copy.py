@@ -64,13 +64,17 @@ def find_cut(mG):
 # Select the indices of the edges across the border
 def choose_fn_idx(mG, faultyNodes, borderNodes):
     fn_copy = faultyNodes.copy()
-    faultyNodesIdx = [[], []]  # TODO: rewrite it to account for more than two communities
+    faultyNodesIdx = [[], []]
+    previousNode = ['a']
+    # TODO: rewrite it to account for more than two communities
     for i in range(nCommunities):
         for j in borderNodes:
-            faultyNodesIdx[i] += [j[i]]  # TODO: rewrite it to account for more than two communities
-            fn_copy[i] -= 1
-            if not fn_copy[i]:
-                break
+            if j[i] != previousNode[-1]:
+                faultyNodesIdx[i] += [j[i]]  # TODO: rewrite it to account for more than two communities
+                fn_copy[i] -= 1
+                if not fn_copy[i]:
+                    break
+                previousNode[-1] = j[i]
         if fn_copy[i]:
             choices = [j for j in list(mG) if j not in faultyNodesIdx[i]]
             faultyNodesIdx[i] += random.sample(choices, fn_copy[i])
