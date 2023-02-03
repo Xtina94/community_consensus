@@ -13,7 +13,7 @@ from itertools import islice
 
 import parameters
 from parameters import gSize, nCommunities, \
-    mu, mu_bad, sigma, sigma_bad, n, path
+    mu, mu_bad, sigma, sigma_bad, n, path, thr, pQueryOracle
 
 
 # Clean the outputs folder or make a new one if it doesn't exist
@@ -156,51 +156,50 @@ def get_glob_pot(vals, mG, fnIdx):
     return pot
 
 
-def main_loop_old(mG, values, goodValues, fn_indices, condition_list):
-    t, counter = 1, 0
-    badValuesIdx = fn_indices[0]
-    for c in range(nCommunities):
-        badValuesIdx += fn_indices[c]
-    while any(condition_list) > 0.001 and counter < 30 * int(math.log(n)):  # and distanceChange > 0.001:
-        temp, nodeAttributes = values.copy(), {}
-        for x in list(mG):
-            neighVals = []
-            if x not in badValuesIdx:
-                neighbors = list(mG.adj[x])
-                for c in range(nCommunities):
-                    neighVals += [values[c][j] for j in neighbors if j in values[c].keys()]
-                for c in range(nCommunities):
-                    if x in values[c].keys():
-                        med = majority_median(neighVals)
-                        temp[c].update({x: med})
-                        goodValues[c].update({x: med})
-        for c in range(nCommunities):
-            nodeAttributes.update(temp[c])
-        nx.set_node_attributes(mG, nodeAttributes, 'Values')
-        display_graph(mG, t, 'Graph_iter', path)
-
-        values = temp
-
-        # Update potentials
-        community_potential = calculate_community_potential(goodValues, mG)
-
-        condition_list = []
-        for c in range(nCommunities):
-            condition_list += list(np.abs(community_potential[c]))
-
-        t += 1
-        counter += 1
-
-        return community_potential, t, values
-
-
 def save_data(vals, mStr):
     data = {'Comm 0': [round(r, 4) for r in vals[0].values()]}
     for c in range(1, nCommunities):
         data.update({f'Comm {c}': [round(r, 4) for r in vals[c].values()]})
     df = pd.DataFrame(data)
-    # for c in range(1, nCommunities):
-    #     mStr = f'Comm {c}'
-    #     df[mStr] = list(vals[c].values())
     df.to_csv(path + mStr, index=False)
+
+
+def update_step(otherG, x_b, threshold, x_b_goodValues, bvi, tScnd, red):
+    temp_b = copy.deepcopy(x_b)
+    for x in list(otherG):
+        neighVals = {}
+        if x not in bvi:
+            neighbors = list(otherG.adj[x])
+            for c in range(nCommunities):
+                neighVals.update({j: x_b[c][j] for j in neighbors if j in x_b[c].keys()})
+
+            for c in range(nCommunities):
+                # Key part in here
+                if x in x_b[c].keys():
+                    x_b_goodValues.append({})
+                    otherCommunityVals = [k for k in neighVals.values() if
+                                          k != threshold[c]]
+
+                    if tScnd < thr:
+                        redundantVals = oracle_help(x, neighbors, otherG, red, x_b, pQueryOracle)
+                        otherCommunityVals += [k for k in redundantVals.values() if
+                                               k != threshold[c]]
+
+                    if otherCommunityVals:
+                        med = mMedian(otherCommunityVals)
+                    else:
+                        med = x_b[c][x]
+                    temp_b[c].update({x: med})
+                    x_b_goodValues[c].update({x: med})
+    return temp_b
+
+
+def oracle_help(node, neighs, oG, mRed, nodeVals, pQuery):
+    redundantValues = {}
+    if np.random.binomial(1, pQuery):
+        redundancyOptions = [i for i in list(oG) if i not in neighs + [node]]
+        redundantNodes = random.sample(redundancyOptions, mRed)
+        for c in range(nCommunities):
+            redundantValues.update({i: nodeVals[c][i] for i in redundantNodes if i in nodeVals[c].keys()})
+    return redundantValues
 

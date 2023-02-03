@@ -1,0 +1,6 @@
+n of faulty nodes: 2
+N of nodes: [20, 20]
+n of redundant nodes: 6
+The initial median: [0.4059, 29.6419]
+The median of medians: 29.6419
+The final medians: [0.4059, 29.2333]

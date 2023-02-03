@@ -4,8 +4,10 @@ import warnings
 
 import networkx as nx
 import numpy as np
+from copy import deepcopy
 
 import functions_copy as fc
+import parameters
 from parameters import STOCHASTIC_BLOCK_MODEL, n, p, q, pQueryOracle, path, nCommunities
 
 # Suppress future warnings, comment if code not running due to  this
@@ -53,27 +55,30 @@ l = {}
 medianTotal = fc.mMedian(list(l.values()))
 medianOfMedian = fc.mMedian(median)
 
-print(f'The initial median: {median}\nThe global median: {medianTotal}'
-      f'\nThe median of medians: {medianOfMedian}')
+with open(path + 'paramsAndMedians.txt', 'w+') as f:
+    f.write(f'n of faulty nodes: {tf}'
+            f'\nN of nodes: {parameters.gSize}'
+            f'\nn of redundant nodes: {redNodes}'
+            f'\nThe initial median: {[round(m, 4) for m in median.copy()]}'
+            f'\nThe median of medians: {round(medianOfMedian.copy(), 4)}\n')
 
 "Calculate the potentials"
 print('Calculate the potentials...')
 community_potential = fc.get_comm_pot(goodValues, G)
 global_potential = fc.get_glob_pot(values, G, fn_indices)
 
+print(f'Obtain community median...')
 
-print(f'######################## Obtain community median ########################')
-
-condition_list = list(np.abs(community_potential[0]))
+condition = list(np.abs(community_potential[0]))
 for c in range(1, nCommunities):
-    condition_list += list(np.abs(community_potential[c]))
+    condition += list(np.abs(community_potential[c]))
 
 t, counter = 1, 0
 badValuesIdx = fn_indices[0]
 for c in range(nCommunities):
     badValuesIdx += fn_indices[c]
-while any(condition_list) > 0.001 and counter < 30 * int(math.log(n)):  # and distanceChange > 0.001:
-    temp, nodeAttributes = values.copy(), {}
+while any(condition) > 0.001 and counter < 30 * int(math.log(n)):  # and distanceChange > 0.001:
+    temp, nodeAttr = values.copy(), {}
     for x in list(G):
         neighVals = []
         if x not in badValuesIdx:
@@ -86,8 +91,8 @@ while any(condition_list) > 0.001 and counter < 30 * int(math.log(n)):  # and di
                     temp[c].update({x: med})
                     goodValues[c].update({x: med})
     for c in range(nCommunities):
-        nodeAttributes.update(temp[c])
-    nx.set_node_attributes(G, nodeAttributes, 'Values')
+        nodeAttr.update(temp[c])
+    nx.set_node_attributes(G, nodeAttr, 'Values')
     fc.display_graph(G, t, 'Graph_iter', path)
 
     values = temp
@@ -95,66 +100,62 @@ while any(condition_list) > 0.001 and counter < 30 * int(math.log(n)):  # and di
     # Update potentials
     community_potential = fc.get_comm_pot(goodValues, G)
 
-    condition_list = []
+    condition = []
     for c in range(nCommunities):
-        condition_list += list(np.abs(community_potential[c]))
+        condition += list(np.abs(community_potential[c]))
 
     t += 1
     counter += 1
 
+median = [fc.mMedian(list(values[i].values())) for i in range(nCommunities)]
+
+"Save Data to files"
 fc.save_data(values, 'Community Medians.csv')
+with open(path + 'paramsAndMedians.txt', 'a') as f:
+    f.write(f'The final medians: {[round(m, 4) for m in median]}\n')
 
+print('Data saved to file.')
 
-print(f'############################### Obtaining the external medians ###############################')
+print(f'Obtain the external medians...')
 
 otherG = G.copy()
 tSecond = 0
 threshold = {}
 
-# x_b, x_b_goodValues, nodeAttributes = deepcopy(values), [], {}
-# temp_b = deepcopy(values)
-# for c in range(nCommunities):
-#     threshold[c] = fc.mMedian(list(values[c].values()))
-#
-# x_b = fc.update_step(otherG, x_b, threshold, temp_b, x_b_goodValues, badValuesIdx, tSecond, redNodes)
-#
-# community_potential = fc.calculate_community_potential(x_b_goodValues, otherG)
-# global_potential = fc.calculate_global_potential(x_b_goodValues, otherG)
-#
-# condition_list = []
-# for c in range(nCommunities):
-#     condition_list += list(np.abs(community_potential[c]))
-#     threshold[c] = fc.mMedian(list(values[c].values()))
-#     nodeAttributes.update(x_b[c])
-#
-# nx.set_node_attributes(otherG, nodeAttributes, 'Values')
-# fc.display_graph(otherG, tSecond, 'OtherCommunity_iter', path)
-#
-# counter = 0
-# while any(condition_list) > 0.01 and counter < 3 * int(math.log(n)):  # and distanceChange > 0.001:
-#     temp_b, x_b_goodValues, nodeAttributes = deepcopy(x_b), [], {}
-#     x_b = fc.update_step(otherG, x_b, threshold, temp_b, x_b_goodValues, badValuesIdx, tSecond, redNodes)
-#
-#     community_potential = fc.calculate_community_potential(x_b_goodValues, otherG)
-#     global_potential = fc.calculate_global_potential(x_b_goodValues, otherG)
-#
-#     condition_list = []
-#     for c in range(nCommunities):
-#         condition_list += list(np.abs(community_potential[c]))
-#         nodeAttributes.update(x_b[c])
-#     nx.set_node_attributes(otherG, nodeAttributes, 'Values')
-#     fc.display_graph(otherG, tSecond, 'OtherCommunity_iter', path)
-#
-#     tSecond += 1
-#     counter += 1
-#
-# b = otherG.nodes.data(True)
-# print(b)
-# # data1 = [b[i][0] for i in range(len(b))]
-# # data2 = [b[i][1]['Values'] for i in range(len(b))]
-# # data = [data1, data2]
-# data = [[b[i][0], b[i][1]['Values']] for i in range(len(b))]
-# myDf = pandas.DataFrame(data, index=False)
-# pandas.to_excel(myDf, "./DecOutputs/GraphAttrib.xlsx")
-#
-# # print(f'The global potential: {global_potential}')  # TODO: Cris do not delete this
+goodValsOther, nodeAttr = [], {}
+valsOther = deepcopy(values)
+threshold = deepcopy(median)
+
+valsOther = fc.update_step(otherG, valsOther, threshold, goodValsOther,
+                           badValuesIdx, tSecond, redNodes)
+
+community_potential = fc.get_comm_pot(goodValsOther, otherG)
+
+condition = []
+for c in range(nCommunities):
+    condition += list(np.abs(community_potential[c]))
+    nodeAttr.update(valsOther[c])
+
+nx.set_node_attributes(otherG, nodeAttr, 'Values')
+fc.display_graph(otherG, tSecond, 'OtherCommunity_iter', path)
+
+counter = 0
+while any(condition) > 0.001 and counter < 3 * int(math.log(n)):  # and distanceChange > 0.001:
+    temp_b = deepcopy(valsOther),
+    goodValsOther, nodeAttr = [], {}
+    valsOther = fc.update_step(otherG, valsOther, threshold,
+                               goodValsOther, badValuesIdx, tSecond, redNodes)
+
+    community_potential = fc.get_comm_pot(goodValsOther, otherG)
+
+    condition = []
+    for c in range(nCommunities):
+        condition += list(np.abs(community_potential[c]))
+        nodeAttr.update(valsOther[c])
+    nx.set_node_attributes(otherG, nodeAttr, 'Values')
+    fc.display_graph(otherG, tSecond, 'OtherCommunity_iter', path)
+
+    tSecond += 1
+    counter += 1
+
+fc.save_data(valsOther, 'Other Community Medians.csv')
