@@ -1,10 +1,13 @@
+import math
+
 path = './Outputs/'
 BORDER_NODES_OPTION = 1
 STOCHASTIC_BLOCK_MODEL = 1
 n = 500
-gSize = [n, n]
+gSize = [n, 2 * n]
 nCommunities = 2  # The number of communities
-p, q = 0.5, 0.01
+p = 5*math.log(n)/n
+q = p/10
 pQueryOracle = 0.3
 
 thr = 3  # The number of times the oracle is queried

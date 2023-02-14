@@ -8,7 +8,7 @@ from copy import deepcopy
 
 import functions_copy as fc
 import parameters
-from parameters import STOCHASTIC_BLOCK_MODEL, n, p, q, pQueryOracle, path, nCommunities
+from parameters import STOCHASTIC_BLOCK_MODEL, n, p, q, gSize, pQueryOracle, path, nCommunities
 
 # Suppress future warnings, comment if code not running due to  this
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -23,11 +23,11 @@ else:
 if STOCHASTIC_BLOCK_MODEL:
     # G is generated through a stochastic block model
     probs = [[p, q], [q, p]]
-    G = nx.stochastic_block_model([n, n], probs, seed=55)  # Generate graph
+    G = nx.stochastic_block_model(gSize, probs, seed=55)  # Generate graph
     mc_edges, mc, minDegree = fc.find_cut(G)  # Obtain the edges of the inter-blocks cut
 
-    print(f'\nThe length of the cut: '
-          f'{mc}'
+    print(f'p/q: {parameters.p}/{parameters.q}\n'
+          f'The length of the cut: {mc}'
           f'\nThe min degree: {minDegree}')
 else:
     # G is the result of merging two regular graphs
@@ -44,6 +44,8 @@ print(f'n of faulty nodes: {tf}'
 "Initial Step"
 fn_indices = fc.choose_fn_idx(G, fn, mc_edges)
 nu, values, G, goodValues = fc.assign_values(G, fn, fn_indices)
+
+fc.save_data(values, 'Initial Values.csv')
 
 # fc.display_graph(G, 0, 'Graph_iter', path)
 
@@ -109,9 +111,10 @@ while any(condition) > 0.001 and counter < 30 * int(math.log(n)):  # and distanc
 median = [fc.mMedian(list(values[i].values())) for i in range(nCommunities)]
 
 "Save Data to files"
-fc.save_data(values, 'Community Medians.csv')
+fc.save_data(values, 'Intra Community Values.csv')
 with open(path + 'paramsAndMedians.txt', 'a') as f:
     f.write(f'The final medians: {[round(m, 4) for m in median]}\n')
+    f.write(f'The total time: {t - 1}\n')
 
 print('Data saved to file.')
 
@@ -127,6 +130,8 @@ threshold = deepcopy(median)
 
 valsOther = fc.update_step(otherG, valsOther, threshold, goodValsOther,
                            badValuesIdx, tSecond, redNodes)
+
+tSecond += 1
 
 community_potential = fc.get_comm_pot(goodValsOther, otherG)
 
@@ -157,6 +162,9 @@ while any(condition) > 0.001 and counter < 3 * int(math.log(n)):  # and distance
     tSecond += 1
     counter += 1
 
-fc.save_data(valsOther, 'Other Community Medians.csv')
+fc.save_data(valsOther, 'Extra Community Values.csv')
+
+with open(path + 'paramsAndMedians.txt', 'a') as f:
+    f.write(f'The other-community total time: {tSecond - 1}\n')
 
 print('Data saved to file.')

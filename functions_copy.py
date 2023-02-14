@@ -162,9 +162,13 @@ def get_glob_pot(vals, mG, fnIdx):
 
 def save_data(vals, mStr):
     data = {'Comm 0': [round(r, 4) for r in vals[0].values()]}
-    for c in range(1, nCommunities):
-        data.update({f'Comm {c}': [round(r, 4) for r in vals[c].values()]})
     df = pd.DataFrame(data)
+    for c in range(1, nCommunities):
+        data = {f'Comm {c}': [round(r, 4) for r in vals[c].values()]}
+        addition = pd.DataFrame(data)
+        df = pd.concat([df, addition], axis=1)
+        # data.update({f'Comm {c}': [round(r, 4) for r in vals[c].values()]})
+    # df = pd.DataFrame(data)
     df.to_csv(path + mStr, index=False)
 
 
