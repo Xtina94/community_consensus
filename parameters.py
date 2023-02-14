@@ -1,14 +1,22 @@
 import math
 
+import numpy as np
+
 path = './Outputs/'
 BORDER_NODES_OPTION = 1
 STOCHASTIC_BLOCK_MODEL = 1
+ITERATIONS = 10
 n = 500
-gSize = [n, 2 * n]
+C = 7  # The suitable large constant for the probabilities of forming edges
+gSize = [n, n]
 nCommunities = 2  # The number of communities
-p = 5*math.log(n)/n
-q = p/10
-pQueryOracle = 0.3
+p = np.zeros(nCommunities)
+q = np.zeros(nCommunities)
+for c in range(nCommunities):
+    p[c] = C * math.log(gSize[c])/gSize[c]
+    q[c] = 1/(C/2 * math.log(gSize[c])*gSize[c])
+q = min(q)
+pQueryOracle = 0.8
 
 thr = 3  # The number of times the oracle is queried
 

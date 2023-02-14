@@ -1,8 +1,9 @@
-n of faulty nodes: 50
-N of nodes: [500, 1000]
-n of redundant nodes: 184
-The initial median: [0.1186, 29.9624]
-The median of medians: 29.9624
-The final medians: [0.6793, 29.8849]
-The total time: 5
-The other-community total time: 2
+n of faulty nodes: 48
+N of nodes: [500, 500]
+n of redundant nodes: 60
+The Minimum degree: 26
+The XCommunity cut size: 24
+
+*********************************************
+The failure rate: [0.0, 0.0]
+The average times: [3.0, 1.0]

@@ -10,6 +10,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from itertools import islice
+from collections import Counter
 
 import parameters
 from parameters import gSize, nCommunities, \
@@ -33,7 +34,7 @@ def clean_fldr():
 # Generate a graph stochastic block model - like
 def generate_graph(commSize, pd, qd):
     degree = int(pd * commSize)
-    print(f'The degree: {degree}')
+    print(f'The Average degree: {degree}')
     minCut = int(qd * commSize)
     print(f'The min cut: {minCut}')
     G1 = nx.random_regular_graph(degree, commSize)
@@ -52,13 +53,19 @@ def find_cut(mG):
     minDegree = min([i[1] for i in mG.degree])
     partitionCut = []
     for e in mG.edges:
-        if e[0] < parameters.n:
-            if e[1] >= parameters.n:
+        if e[0] < parameters.gSize[0]:
+            if e[1] >= parameters.gSize[0]:
                 partitionCut.append(e)
         else:
             break
     cutSize = len(partitionCut)
-    return partitionCut, cutSize, minDegree
+    border = [[e[0] for e in partitionCut], [e[1] for e in partitionCut]]
+    faultyDegrees = [{i: mG.degree[i] for i in border[0]}, {i: mG.degree[i] for i in border[1]}]
+    excess = [{i: faultyDegrees[0][i] - Counter(border[0])[i] for i in border[0]},
+              {i: faultyDegrees[1][i] - Counter(border[1])[i] for i in border[1]}]
+    rValues = list(Counter(border[0]).values()) + list(Counter(border[1]).values())
+    rValues = Counter(rValues)  # keys are the degree, values are the number of nodes with that degree
+    return partitionCut, cutSize, minDegree, rValues, excess
 
 
 # Select the indices of the edges across the border
@@ -188,10 +195,10 @@ def update_step(otherG, x_b, threshold, x_b_goodValues, bvi, tScnd, red):
                     otherCommunityVals = [k for k in neighVals.values() if
                                           k != threshold[c]]
 
-                    if tScnd < thr:
-                        redundantVals = oracle_help(x, neighbors, otherG, red, x_b, pQueryOracle)
-                        otherCommunityVals += [k for k in redundantVals.values() if
-                                               k != threshold[c]]
+                    # if tScnd < thr:
+                    redundantVals = oracle_help(x, neighbors, otherG, red, x_b, pQueryOracle)
+                    otherCommunityVals += [k for k in redundantVals.values() if
+                                           k != threshold[c]]
 
                     if otherCommunityVals:
                         med = mMedian(otherCommunityVals)
