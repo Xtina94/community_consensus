@@ -7,6 +7,8 @@ import networkx as nx
 import numpy as np
 from copy import deepcopy
 
+import pandas as pd
+
 import functions_copy as fc
 import parameters
 from parameters import STOCHASTIC_BLOCK_MODEL, ITERATIONS, n, p, q, gSize, pQueryOracle, path, nCommunities, mu_bad
@@ -45,7 +47,7 @@ print(f'n of faulty nodes: {tf}'
       f'\nn of redundant nodes: {redNodes}')
 
 fc.display_graph(groundG, 0, 'Graph', path)
-medianOther = []  # The list containing the final medians at every iteration
+medianOther, median, initialMedian = [], [], []  # The list containing the final medians at every iteration
 times = []
 
 with open(path + 'paramsAndMedians.txt', 'w+') as f:
@@ -69,11 +71,11 @@ for iteration in range(ITERATIONS):
     # fc.display_graph(G, 0, 'Graph_iter', path)
 
     "Calculate the initial median"
-    median = [fc.mMedian(list(values[i].values())) for i in range(nCommunities)]
+    initialMedian.append([fc.mMedian(list(values[i].values())) for i in range(nCommunities)])
     l = {}
     [l.update(values[i]) for i in range(nCommunities)]
     medianTotal = fc.mMedian(list(l.values()))
-    medianOfMedian = fc.mMedian(median)
+    medianOfMedian = fc.mMedian(initialMedian)
 
     # with open(path + 'paramsAndMedians.txt', 'a') as f:
     #     f.write(f'\nThe initial median: {[round(m, 4) for m in median.copy()]}'
@@ -125,10 +127,10 @@ for iteration in range(ITERATIONS):
         t += 1
         counter += 1
 
-    median = [fc.mMedian(list(values[i].values())) for i in range(nCommunities)]
+    median.append([fc.mMedian(list(values[i].values())) for i in range(nCommunities)])
 
     "Save Data to files"
-    # fc.save_data(values, 'Intra Community Values.csv')
+    fc.save_data(values, 'Intra Community Values.csv')
     # with open(path + 'paramsAndMedians.txt', 'a') as f:
     #     f.write(f'The final medians: {[round(m, 4) for m in median]}\n')
     #     f.write(f'The total time: {t - 1}\n')
@@ -143,7 +145,7 @@ for iteration in range(ITERATIONS):
 
     goodValsOther, nodeAttr = [], {}
     valsOther = deepcopy(values)
-    threshold = deepcopy(median)
+    threshold = deepcopy(median[-1])
 
     valsOther = fc.update_step(otherG, valsOther, threshold, goodValsOther,
                                badValuesIdx, tSecond, redNodes)
@@ -183,26 +185,40 @@ for iteration in range(ITERATIONS):
         counter += 1
 
     medianOther.append([round(fc.mMedian(list(valsOther[i].values())), 3) for i in range(nCommunities)])
+    # medianOther.append([fc.mMedian(list(valsOther[i].values())) for i in range(nCommunities)])
     times.append([t-1, tSecond-1])
 
-    # fc.save_data(valsOther, f'Extra Community Values {tSecond}.csv')
+    fc.save_data(valsOther, f'Extra Community Values.csv')
 
     # with open(path + 'paramsAndMedians.txt', 'a') as f:
     #     f.write(f'The other-community total time: {tSecond - 1}\n')
     #
     # print('Data saved to file.')
 
-badLuck = [sum([medianOther[j][0] == mu_bad for j in range(ITERATIONS)]), sum([medianOther[j][1] == mu_bad for j in range(ITERATIONS)])]
-badLuck = [badLuck[0]/ITERATIONS, badLuck[1]/ITERATIONS]
+failureIntra = [sum([median[j][0] == mu_bad for j in range(ITERATIONS)]), sum([median[j][1] == mu_bad for j in range(ITERATIONS)])]
+failureIntra = [failureIntra[0]/ITERATIONS, failureIntra[1]/ITERATIONS]
+failureXComm = [sum([medianOther[j][0] == mu_bad for j in range(ITERATIONS)]), sum([medianOther[j][1] == mu_bad for j in range(ITERATIONS)])]
+failureXComm = [failureXComm[0]/ITERATIONS, failureXComm[1]/ITERATIONS]
+
 times = np.array(times)
 times = np.mean(times, axis=0)
 times = [round(i, 3) for i in times]
 
+fc.save_data(valsOther, f'Extra Community Values.csv')
+
 with open(path + 'paramsAndMedians.txt', 'a') as f:
-    f.write(f'The failure rate: {badLuck}\n')
+    f.write(f'The failure rate 1st step: {failureIntra}\n')
+    f.write(f'The failure rate 2nd step: {failureXComm}\n')
     f.write(f'The average times: {times}')
 
+median = pd.DataFrame(median)
+medianOther = pd.DataFrame(medianOther)
+# dfMedians = pd.concat([median, medianOther], axis=1)
+# df.to_csv(path + 'mStr', index=False)
+
 with open(path + 'medians.txt', 'w+') as f:
-    f.write(f'The medians: {medianOther}\n')
+    f.write(f'The initial medians: {pd.DataFrame(initialMedian)}\n')
+    f.write(f'The medians 1st step: {median}\n')
+    f.write(f'The medians 2nd step: {medianOther}\n')
 
 print('Data saved to file.')

@@ -1,9 +1,10 @@
-n of faulty nodes: 48
-N of nodes: [500, 500]
-n of redundant nodes: 60
-The Minimum degree: 26
-The XCommunity cut size: 24
+n of faulty nodes: 42
+N of nodes: [1000, 1000]
+n of redundant nodes: 140
+The Minimum degree: 24
+The XCommunity cut size: 21
 
 *********************************************
-The failure rate: [0.0, 0.0]
-The average times: [3.0, 1.0]
+The failure rate 1st step: [0.0, 0.0]
+The failure rate 2nd step: [1.0, 1.0]
+The average times: [3.1, 2.0]
