@@ -16,11 +16,11 @@ from parameters import STOCHASTIC_BLOCK_MODEL, ITERATIONS, n, p, q, gSize, pQuer
 # Suppress future warnings, comment if code not running due to  this
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-"Clean the output folder"
-if os.path.exists(path):
-    fc.clean_fldr()
-else:
-    os.makedirs(path)
+# "Clean the output folder"
+# if os.path.exists(path):
+#     fc.clean_fldr()
+# else:
+#     os.makedirs(path)
 
 "Set up the graph"
 if STOCHASTIC_BLOCK_MODEL:
@@ -41,7 +41,7 @@ else:
 
 tf = 2 * mc  # math.ceil(2 * n * 0.025)  # top faulty nodes
 fn = [math.floor(tf / 2), tf - math.floor(tf / 2)]  # The faulty nodes per community
-redNodes = math.ceil(1 * tf * 1/pQueryOracle)  # The amount of redundant nodes
+redNodes = 50  # math.ceil(1 * tf * 1/pQueryOracle)  # The amount of redundant nodes
 
 print(f'n of faulty nodes: {tf}'
       f'\nn of redundant nodes: {redNodes}')
@@ -211,14 +211,37 @@ with open(path + 'paramsAndMedians.txt', 'a') as f:
     f.write(f'The failure rate 2nd step: {failureXComm}\n')
     f.write(f'The average times: {times}')
 
-median = pd.DataFrame(median)
-medianOther = pd.DataFrame(medianOther)
 # dfMedians = pd.concat([median, medianOther], axis=1)
 # df.to_csv(path + 'mStr', index=False)
 
-with open(path + 'medians.txt', 'w+') as f:
-    f.write(f'The initial medians: {pd.DataFrame(initialMedian)}\n')
-    f.write(f'The medians 1st step: {median}\n')
-    f.write(f'The medians 2nd step: {medianOther}\n')
+medians = initialMedian + median + medianOther
+medians = [str(f) for f in medians]
+medians = ", ".join(medians)
+
+with open(path + 'medians.txt', 'a') as f:
+    f.write(f'************************\n'
+            f'PQO: {pQueryOracle}'
+            f'\n**********************\n')
+    f.write(f'{medians}\n')
+
+failureIntra = [pQueryOracle] + failureIntra
+failureIntra = [str(f) for f in failureIntra]
+failureXComm = [pQueryOracle] + failureXComm
+failureXComm = [str(f) for f in failureXComm]
+times = [pQueryOracle] + times
+times = [str(f) for f in times]
+
+failureIntra = ", ".join(failureIntra)
+failureXComm = ", ".join(failureXComm)
+times = ", ".join(times)
+
+with open(path + 'failureIntra.txt', 'a') as f:
+    f.write(failureIntra + '\n')
+
+with open(path + 'failureXComm.txt', 'a') as f:
+    f.write(failureXComm + '\n')
+
+with open(path + 'times.txt', 'a') as f:
+    f.write(times + '\n')
 
 print('Data saved to file.')

@@ -181,6 +181,7 @@ def save_data(vals, mStr):
 
 def update_step(otherG, x_b, threshold, x_b_goodValues, bvi, tScnd, red):
     temp_b = copy.deepcopy(x_b)
+    edges = oracle_help(n, pQueryOracle, x_b)  # TODO Latest changes
     for x in list(otherG):
         neighVals = {}
         if x not in bvi:
@@ -195,10 +196,14 @@ def update_step(otherG, x_b, threshold, x_b_goodValues, bvi, tScnd, red):
                     otherCommunityVals = [k for k in neighVals.values() if
                                           k != threshold[c]]
 
+                    edgeNeigh = [edges[i][1] for i in range(len(edges)) if edges[i][0] == x]
+                    otherCommunityVals += edgeNeigh
+
                     # if tScnd < thr:
-                    redundantVals = oracle_help(x, neighbors, otherG, red, x_b, pQueryOracle)
-                    otherCommunityVals += [k for k in redundantVals.values() if
-                                           k != threshold[c]]
+                    # redundantVals = oracle_help(x, neighbors, otherG, red, x_b, pQueryOracle)
+                    # if x in [edges[i][0] for i in range(len(edges))]:
+                        # otherCommunityVals += [k for k in redundantVals.values() if
+                        #                        k != threshold[c]]
 
                     if otherCommunityVals:
                         med = mMedian(otherCommunityVals)
@@ -209,7 +214,7 @@ def update_step(otherG, x_b, threshold, x_b_goodValues, bvi, tScnd, red):
     return temp_b
 
 
-def oracle_help(node, neighs, oG, mRed, nodeVals, pQuery):
+def oracle_help_old(node, neighs, oG, mRed, nodeVals, pQuery):
     redundantValues = {}
     if np.random.binomial(1, pQuery):
         redundancyOptions = [i for i in list(oG) if i not in neighs + [node]]
@@ -217,4 +222,19 @@ def oracle_help(node, neighs, oG, mRed, nodeVals, pQuery):
         for c in range(nCommunities):
             redundantValues.update({i: nodeVals[c][i] for i in redundantNodes if i in nodeVals[c].keys()})
     return redundantValues
+
+
+def oracle_help(n, pQueryOracle, nodeVals):
+    E = np.random.binomial(n*(n-1), pQueryOracle)
+    edges = []
+    redundantValues = {}
+    for e in range(E):
+        u = random.randint(0, 2*n)
+        v = random.randint(0, 2*n)
+        for c in range(nCommunities):
+            if v in nodeVals[c].keys():
+                edges.append((u, nodeVals[c][v]))
+                # redundantValues.update({u: nodeVals[c][v]})
+            # redundantValues.update({u: nodeVals[c][u] if u in nodeVals[c].keys()})
+    return edges
 
