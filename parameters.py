@@ -5,7 +5,6 @@ import numpy as np
 
 path = './Outputs/'
 BORDER_NODES_OPTION = 1
-STOCHASTIC_BLOCK_MODEL = 1
 ITERATIONS = 1
 n = 500
 C = 5  # The suitable large constant for the probabilities of forming edges

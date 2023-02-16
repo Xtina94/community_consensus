@@ -3,6 +3,7 @@ import math
 import os
 import random
 import shutil
+import time
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -167,21 +168,26 @@ def get_glob_pot(vals, mG, fnIdx):
     return pot
 
 
-def save_data(vals, mStr):
+def save_data(vals, mStr, t):
     data = {'Comm 0': [round(r, 4) for r in vals[0].values()]}
     df = pd.DataFrame(data)
     for c in range(1, nCommunities):
         data = {f'Comm {c}': [round(r, 4) for r in vals[c].values()]}
         addition = pd.DataFrame(data)
         df = pd.concat([df, addition], axis=1)
-        # data.update({f'Comm {c}': [round(r, 4) for r in vals[c].values()]})
-    # df = pd.DataFrame(data)
-    df.to_csv(path + mStr, index=False)
+    with pd.ExcelWriter(path + mStr, mode='a',
+                        if_sheet_exists='overlay') as writer:  # NOTE: If the overlay option gives error, then Pandas needs upgrading to >= 1.4 version
+        df.to_excel(writer, sheet_name=f't{t}', index=False)
 
 
-def update_step(otherG, x_b, threshold, x_b_goodValues, bvi, tScnd, red):
+def update_step(otherG, listOfNodes, x_b, threshold, x_b_goodValues, bvi, tScnd, red):
     temp_b = copy.deepcopy(x_b)
-    edges = oracle_help(n, pQueryOracle, x_b)  # TODO Latest changes
+    edges = oracle_help(x_b, listOfNodes)  # TODO Latest changes
+    # edgesDict = {e[0]: [] for e in edges}
+    edgesDict = {x: [] for x in list(otherG)}
+    for e in edges:
+        edgesDict[e[0]].append(e[1])
+
     for x in list(otherG):
         neighVals = {}
         if x not in bvi:
@@ -194,16 +200,18 @@ def update_step(otherG, x_b, threshold, x_b_goodValues, bvi, tScnd, red):
                 if x in x_b[c].keys():
                     x_b_goodValues.append({})
                     otherCommunityVals = [k for k in neighVals.values() if
-                                          k != threshold[c]]
+                                          round(k, 4) != round(threshold[c], 4)]
+                    otherCommunityVals += [k for k in edgesDict[x] if
+                                           round(k, 4) != round(threshold[c], 4)]
 
-                    edgeNeigh = [edges[i][1] for i in range(len(edges)) if edges[i][0] == x]
-                    otherCommunityVals += edgeNeigh
+                    # edgeNeigh = [edges[i][1] for i in range(len(edges)) if edges[i][0] == x]
+                    # otherCommunityVals += edgeNeigh
 
                     # if tScnd < thr:
                     # redundantVals = oracle_help(x, neighbors, otherG, red, x_b, pQueryOracle)
                     # if x in [edges[i][0] for i in range(len(edges))]:
-                        # otherCommunityVals += [k for k in redundantVals.values() if
-                        #                        k != threshold[c]]
+                    # otherCommunityVals += [k for k in redundantVals.values() if
+                    #                        k != threshold[c]]
 
                     if otherCommunityVals:
                         med = mMedian(otherCommunityVals)
@@ -224,17 +232,40 @@ def oracle_help_old(node, neighs, oG, mRed, nodeVals, pQuery):
     return redundantValues
 
 
-def oracle_help(n, pQueryOracle, nodeVals):
-    E = np.random.binomial(n*(n-1), pQueryOracle)
+def oracle_help(nodeVals, lon):
+    myList = copy.copy(lon)
     edges = []
-    redundantValues = {}
-    for e in range(E):
-        u = random.randint(0, 2*n)
-        v = random.randint(0, 2*n)
+    edgeVal = []
+    E = np.random.binomial(n * (n - 1), pQueryOracle)
+    'Option 1 - without replacement in edges'
+    startTime = time.time()
+    probs = [1 / len(lon) for _ in range(len(lon))]
+    nodeFrequency = np.random.multinomial(E,
+                                          probs)  # vector of n elements: every elements has a values v, 0<= v <= E indicating how many edges contain that node as extreme
+    startNodes = np.nonzero(nodeFrequency)  # vector of the nodes whose frequency has been sampled in the line above
+    for i in startNodes[0]:  # for loop of E iterations
+        tmp = random.sample(myList, nodeFrequency[
+            i])  # Sample without replacement nodeFrequency[i] neighbors for i from the entire list
+        edges += [(i, k) for k in tmp]
         for c in range(nCommunities):
-            if v in nodeVals[c].keys():
-                edges.append((u, nodeVals[c][v]))
-                # redundantValues.update({u: nodeVals[c][v]})
-            # redundantValues.update({u: nodeVals[c][u] if u in nodeVals[c].keys()})
-    return edges
-
+            edgeVal += [(i, nodeVals[c][k]) for k in tmp if k in nodeVals[c].keys()]
+    endTime = time.time()
+    print(f'Total time: {endTime - startTime}')
+    'Option 2 - With replacement in edges'
+    # startTime = time.time()
+    # for e in range(E):
+    #     [u, v] = random.choices(myList, k=2)  # samples WITH replacement
+    #     edges.append((u, v))
+    #     # [u, v] = random.sample(myList, 2)  # samples WITHOUT replacement
+    #
+    #     # u = random.randint(0, 2*n)
+    #     # v = random.randint(0, 2*n)
+    #     for c in range(nCommunities):
+    #         if v in nodeVals[c].keys():
+    #             edgeVal.append((u, nodeVals[c][v]))
+    # endTime = time.time()
+    # print(f'Total time: {endTime - startTime}')
+    edges = set(edges)
+    nEdges = len(edges)
+    print(f'We sampled {nEdges} unique edges')
+    return edgeVal

@@ -1,3 +1,8 @@
+File containing the simulation parameters, the failure rates within each community,
+the convergence times in the first and second step.
+
+-----------------------------------------------------------------------------------
+
 n of faulty nodes: 42
 N of nodes: [500, 500]
 n of redundant nodes: 50
@@ -6,5 +11,5 @@ The XCommunity cut size: 21
 
 *********************************************
 The failure rate 1st step: [0.0, 0.0]
-The failure rate 2nd step: [1.0, 1.0]
-The average times: [3.0, 3.0]
+The failure rate 2nd step: [0.0, 0.0]
+The average times: [5.0, 1.0]
