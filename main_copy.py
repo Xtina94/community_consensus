@@ -38,7 +38,7 @@ listOfNodes = list(groundG)
 print(f'p/q: {parameters.p}/{parameters.q}\n'
       f'The length of the cut: {mc}\n'
       f'The degrees on the cut: {rValues}\n'
-      f'The excess inner degrees: {excessInnerDegree}\n'
+      # f'The excess inner degrees: {excessInnerDegree}\n'
       f'The min degree: {minDegree}\n'
       f'The pQueryOracle: {pQueryOracle}')
 
@@ -93,7 +93,7 @@ for iteration in range(ITERATIONS):
     for c in range(nCommunities):
         badValuesIdx += fn_indices[c]
     while any(condition) > 0.001 and counter < 30 * int(math.log(n)):  # and distanceChange > 0.001:
-        temp, nodeAttr = values.copy(), {}
+        temp, nodeAttr = copy.deepcopy(values), {}  # TODO check this deepcopy, please let it be non influential
         for x in list(G):
             neighVals = []
             if x not in badValuesIdx:

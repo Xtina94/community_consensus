@@ -25,3 +25,4 @@ def create_files():
     valuesOverTimeDf = pd.DataFrame(columns=['Comm 0', 'Comm 1'])
     valuesOverTimeDf.to_excel(path + 'Network Values - First Step.xlsx', sheet_name='t0',  index=False)
     valuesOverTimeDf.to_excel(path + 'Network Values - Second Step.xlsx', sheet_name='t0',  index=False)
+    valuesOverTimeDf.to_excel(path + 'Network Tokens - First Step.xlsx', sheet_name='t0',  index=False)
