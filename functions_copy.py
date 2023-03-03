@@ -46,22 +46,13 @@ def assign_values(mG, faultyNodes, faultyNodesIdx):
 
 
 # Select the indices of the edges across the border
-def choose_fn_idx(mG, faultyNodes, borderNodes):
-    fn_copy = faultyNodes.copy()
+def choose_fn_idx(faultyNodes, borderNodes):  # borderNodes = [(e1, e2), (e3, e4), ...]
     faultyNodesIdx = [[], []]
-    previousNode = ['a']
-    # TODO: rewrite it to account for more than two communities
+
+    border = [[], []]
     for i in range(nCommunities):
-        for j in borderNodes:
-            if j[i] != previousNode[-1]:
-                faultyNodesIdx[i] += [j[i]]  # TODO: rewrite it to account for more than two communities
-                fn_copy[i] -= 1
-                if not fn_copy[i]:
-                    break
-                previousNode[-1] = j[i]
-        if fn_copy[i]:
-            choices = [j for j in list(mG) if j not in faultyNodesIdx[i]]
-            faultyNodesIdx[i] += random.sample(choices, fn_copy[i])
+        border[i] = set([l[i] for l in borderNodes])
+        faultyNodesIdx[i] = random.sample(border[i], faultyNodes[i])
 
     return faultyNodesIdx
 
@@ -223,7 +214,7 @@ def save_data(vals, mStr, t):
         df.to_excel(writer, sheet_name=f't{t}', index=False)
 
 
-def update_step(otherG, listOfNodes, x_b, threshold, x_b_goodValues, bvi, tScnd, red):
+def update_step(otherG, listOfNodes, x_b, threshold, x_b_goodValues, bvi, tScnd):
     temp_b = copy.deepcopy(x_b)
     if tScnd < thr:
         edges = oracle_help(x_b, listOfNodes)

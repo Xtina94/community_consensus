@@ -12,7 +12,7 @@ import pandas as pd
 import DataVectors
 import functions_copy as fc
 import parameters
-from parameters import ITERATIONS, n, p, q, gSize, pQueryOracle, path, nCommunities, mu_bad
+from parameters import ITERATIONS, n, p, q, gSize, pQueryOracle, C, path, nCommunities, mu_bad
 from DataVectors import initialMedian, median, medianOther, times, firstStepValues, secondStepValues
 
 # Suppress future warnings, comment if code not running due to  this
@@ -31,30 +31,30 @@ DataVectors.create_files()
 
 # G is generated through a stochastic block model
 probs = [[p[0], q], [q, p[1]]]  # TODO make it robust to multiple communities
-groundG = nx.stochastic_block_model(gSize, probs, seed=55)  # Generate graph
+groundG = nx.stochastic_block_model(gSize, probs, seed=65)  # Generate graph
 mc_edges, mc, minDegree, rValues, excessInnerDegree = fc.find_cut(groundG)  # Obtain the edges of the inter-blocks cut
 listOfNodes = list(groundG)
 
-print(f'p/q: {parameters.p}/{parameters.q}\n'
-      f'The length of the cut: {mc}\n'
-      f'The degrees on the cut: {rValues}\n'
-      # f'The excess inner degrees: {excessInnerDegree}\n'
+print(f'n = {n}\n'
+      f'C = {C}\n'
+      f'p = {C} * log(n)/sqrt(n): {[round(i, 4) for i in parameters.p]}\n'
+      f'q = {C} * ((1 - delta) * (n - sqrt(n)) * log(n)) / (n ** (5 / 2)): {round(parameters.q, 4)}\n'
+      f'E[# cut edges] = q * n^2: {round(parameters.q * n**2, 4)}\n'
+      f'The length of the sampled cut |C|: {mc}\n'
+      f'The degrees on the cut {{degree: # nodes}}: {rValues}\n'
       f'The min degree: {minDegree}\n'
-      f'The pQueryOracle: {pQueryOracle}')
+      f'The r = Pr[query oracle]: {pQueryOracle}')
 
-tf = 2 * mc  # top faulty nodes
-fn = [math.floor(tf / 2), tf - math.floor(tf / 2)]  # The faulty nodes per community
-redNodes = 50  # The amount of redundant nodes
+tf = int(0.05*n)  # mc  # top faulty nodes
+fn = [tf, tf]  # [math.floor(tf / 2), tf - math.floor(tf / 2)]  # The faulty nodes per community
 
-print(f'n of faulty nodes: {tf}'
-      f'\nn of redundant nodes: {redNodes}')
+print(f'The # of faulty nodes = |C|: {2*tf} -- {round((2*tf)/sum(gSize) * 100, 2)} % of total nodes')
 
-# fc.display_graph(groundG, 0, 'Graph', path)
+fc.display_graph(groundG, 0, 'Graph', path)
 
 with open(path + 'paramsAndMedians.txt', 'a') as f:
     f.write(f'n of faulty nodes: {tf}'
             f'\nN of nodes: {parameters.gSize}'
-            f'\nn of redundant nodes: {redNodes}'
             f'\nThe Minimum degree: {minDegree}'
             f'\nThe XCommunity cut size: {mc}\n'
             f'\n*********************************************\n')
@@ -64,7 +64,7 @@ for iteration in range(ITERATIONS):
     print(f'IT: {iteration}\n')
 
     "Initial Step"
-    fn_indices = fc.choose_fn_idx(G, fn, mc_edges)
+    fn_indices = fc.choose_fn_idx(fn, mc_edges)
     nu, values, G, goodValues = fc.assign_values(G, fn, fn_indices)
 
     "Save the data"
@@ -137,7 +137,7 @@ for iteration in range(ITERATIONS):
     threshold = deepcopy(median[-1])
 
     valsOther = fc.update_step(otherG, listOfNodes, valsOther, threshold, goodValsOther,
-                               badValuesIdx, tSecond, redNodes)
+                               badValuesIdx, tSecond)
 
     "Save the data"
     if ITERATIONS == 1:
@@ -159,7 +159,7 @@ for iteration in range(ITERATIONS):
         temp_b = deepcopy(valsOther),
         goodValsOther, nodeAttr = [], {}
         valsOther = fc.update_step(otherG, listOfNodes, valsOther, threshold,
-                                   goodValsOther, badValuesIdx, tSecond, redNodes)
+                                   goodValsOther, badValuesIdx, tSecond)
 
         community_potential = fc.get_comm_pot(goodValsOther, otherG)
 
@@ -181,11 +181,7 @@ for iteration in range(ITERATIONS):
     times.append([t, tSecond])
 
 failureIntra = [sum([median[j][k] == mu_bad for j in range(ITERATIONS)])/ITERATIONS for k in range(nCommunities)]
-#                 sum([median[j][1] == mu_bad for j in range(ITERATIONS)])]
-# failureIntra = [failureIntra[0] / ITERATIONS, failureIntra[1] / ITERATIONS]
 failureXComm = [sum([medianOther[j][k] == mu_bad for j in range(ITERATIONS)])/ITERATIONS for k in range(nCommunities)]
-#                 sum([medianOther[j][1] == mu_bad for j in range(ITERATIONS)])]
-# failureXComm = [failureXComm[0] / ITERATIONS, failureXComm[1] / ITERATIONS]
 
 times = np.array(times)
 times = np.mean(times, axis=0)
@@ -196,37 +192,5 @@ with open(path + 'paramsAndMedians.txt', 'a') as f:
     f.write(f'The failure rate 1st step: {failureIntra}\n')
     f.write(f'The failure rate 2nd step: {failureXComm}\n')
     f.write(f'The average times: {times}')
-
-# medians = initialMedian + median + medianOther
-# medians = [str(f) for f in medians]
-# medians = ", ".join(medians)
-#
-# with open(path + 'medians.txt', 'a') as f:
-#     f.write(f'************************\n'
-#             f'PQO: {pQueryOracle}'
-#             f'\n**********************\n')
-#     f.write(f'{medians}\n')
-#
-# failureIntra = [pQueryOracle] + failureIntra
-# failureIntra = [str(f) for f in failureIntra]
-# failureXComm = [pQueryOracle] + failureXComm
-# failureXComm = [str(f) for f in failureXComm]
-# times = [pQueryOracle] + times
-# times = [str(f) for f in times]
-#
-# failureIntra = ", ".join(failureIntra)
-# failureXComm = ", ".join(failureXComm)
-# times = ", ".join(times)
-#
-# with open(path + 'failureIntra.txt', 'a') as f:
-#     f.write(failureIntra + '\n')
-#
-# with open(path + 'failureXComm.txt', 'a') as f:
-#     f.write(failureXComm + '\n')
-#
-# with open(path + 'times.txt', 'a') as f:
-#     f.write(times + '\n')
-#
-# print('Data saved to file.')
 
 print('Done.')

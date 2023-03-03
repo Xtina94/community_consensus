@@ -6,17 +6,24 @@ import numpy as np
 path = './Outputs/'
 BORDER_NODES_OPTION = 1
 ITERATIONS = 1
-n = 10000  # previously 1000
-C = 9  # previously 7  # The suitable large constant for the probabilities of forming edges
+n = 1000  # previously 1000
+C = 1  # previously 7  # The suitable large constant for the probabilities of forming edges
 gSize = [n, n]
 nCommunities = 2  # The number of communities
 p = np.zeros(nCommunities)
 q = np.zeros(nCommunities)
+lower_tail_prob = 0.058  # Lower tail probability for the node degree
+
 for c in range(nCommunities):
-    p[c] = 10 * C * math.log(gSize[c])/gSize[c]
-    q[c] = 1/(C/0.6 * math.log(gSize[c])*gSize[c])  # previously 1.2
+    p[c] = C * math.sqrt(n) * math.log(gSize[c])/gSize[c]
+    '''By Chernoff, we can estimate the corresponding tail value for the minimum degree'''
+    E_k = (n - 1) * p[c]  # The average degree within communities
+    delta = math.sqrt(math.log(lower_tail_prob ** (-2 / E_k)))
+    q[c] = C * ((1 - delta) * (n - math.sqrt(n)) * math.log(n)) / (n ** (5 / 2))
+    # q[c] = p[c]/(math.sqrt(n) * math.log(n) * math.log(n))  # previously 1.2
 q = min(q)
-pQueryOracle = float(sys.argv[1])/20
+
+pQueryOracle = 0.05  # float(sys.argv[1])/n
 
 thr = 1  # The number of times the oracle is queried
 
