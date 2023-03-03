@@ -57,6 +57,26 @@ def choose_fn_idx(faultyNodes, borderNodes):  # borderNodes = [(e1, e2), (e3, e4
     return faultyNodesIdx
 
 
+# Count the overall edges connecting to faulty nodes
+def count_fn_edges(fn_index, mG):
+    edg = [0 for _ in range(nCommunities)]
+    for c in range(nCommunities):
+        for f in fn_index[c]:
+            k = len(mG.adj[f])
+            edg[c] += k
+    return edg
+
+
+def count_nodes_edges(nn_index, fn_index, mG):
+    edg = [0 for _ in range(nCommunities)]
+    for c in range(nCommunities):
+        for f in nn_index[c]:
+            k = [adj for adj in mG.adj[f] if adj not in fn_index[c]]
+            k = len(k)
+            edg[c] += k
+    return edg
+
+
 # Clean the outputs folder or make a new one if it doesn't exist
 def clean_fldr():
     folder = path
@@ -157,19 +177,25 @@ def mMedian(v):
         return v[0]
 
 
-def oracle_help(nodeVals, lon):
+def oracle_help(nodeVals, lon):  # lon = listOfNodes (list with nodes IDs)
     myList = copy.copy(lon)
     edges = []
     edgeVal = []
-    E = np.random.binomial(n * (n - 1), pQueryOracle)
+    E = np.random.binomial(2 * n * (2 * n - 1), pQueryOracle)
     'Option 1 - without replacement in edges'
     probs = [1 / len(lon) for _ in range(len(lon))]
-    nodeFrequency = np.random.multinomial(E, probs)  # vector of n elements: every elements has a values v, 0<= v <= E indicating how many edges contain that node as extreme
+    nodeFrequency = np.random.multinomial(E, probs)  # vector of n elements: every elements has a values v, 0<=v<=E
+                                                     # indicating how many edges contain that node as extreme
     startNodes = np.nonzero(nodeFrequency)  # vector of the nodes whose frequency has been sampled in the line above
-    for i in startNodes[0]:  # for loop of E iterations
+    xEdges = 0
+    for i in startNodes[0]:  # for loop of E iterations, startNodes contain all the node indices of the nodes that have been selected
         tmp = random.sample(myList, nodeFrequency[
             i])  # Sample without replacement nodeFrequency[i] neighbors for i from the entire list
         edges += [(i, k) for k in tmp]
+        if i < gSize[0]:  # TODO adapt to multi community
+            xEdges += len([e for e in tmp if e >= gSize[0]])
+        else:  # TODO adapt to multi community
+            xEdges += len([e for e in tmp if e < gSize[0]])
         for c in range(nCommunities):
             edgeVal += [(i, nodeVals[c][k]) for k in tmp if k in nodeVals[c].keys()]
     'Option 2 - With replacement in edges'
@@ -188,8 +214,7 @@ def oracle_help(nodeVals, lon):
     # print(f'Total time: {endTime - startTime}')
     edges = set(edges)
     nEdges = len(edges)
-    print(f'We sampled {nEdges} unique edges')
-    return edgeVal
+    return edgeVal, nEdges, xEdges
 
 
 def oracle_help_old(node, neighs, oG, mRed, nodeVals, pQuery):
@@ -217,9 +242,9 @@ def save_data(vals, mStr, t):
 def update_step(otherG, listOfNodes, x_b, threshold, x_b_goodValues, bvi, tScnd):
     temp_b = copy.deepcopy(x_b)
     if tScnd < thr:
-        edges = oracle_help(x_b, listOfNodes)
+        edges, nEdges, xEdges = oracle_help(x_b, listOfNodes)
     else:
-        edges = []
+        edges, nEdges, xEdges = [], 0, 0
     edgesDict = {x: [] for x in list(otherG)}
     for e in edges:
         edgesDict[e[0]].append(e[1])
@@ -255,4 +280,4 @@ def update_step(otherG, listOfNodes, x_b, threshold, x_b_goodValues, bvi, tScnd)
                         med = x_b[c][x]
                     temp_b[c].update({x: med})
                     x_b_goodValues[c].update({x: med})
-    return temp_b
+    return temp_b, nEdges, xEdges

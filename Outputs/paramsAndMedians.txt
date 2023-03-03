@@ -3,12 +3,9 @@ the convergence times in the first and second step.
 
 -----------------------------------------------------------------------------------
 
-n of faulty nodes: 50
+n of faulty nodes: 40
 N of nodes: [1000, 1000]
 The Minimum degree: 177
 The XCommunity cut size: 173
 
 *********************************************
-The failure rate 1st step: [0.0, 0.0]
-The failure rate 2nd step: [0.0, 1.0]
-The average times: [6.0, 3.0]

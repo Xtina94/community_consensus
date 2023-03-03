@@ -22,10 +22,11 @@ for c in range(nCommunities):
     q[c] = C * ((1 - delta) * (n - math.sqrt(n)) * math.log(n)) / (n ** (5 / 2))
     # q[c] = p[c]/(math.sqrt(n) * math.log(n) * math.log(n))  # previously 1.2
 q = min(q)
+tf = int(0.04*n)  # mc  # top faulty nodes
 
-pQueryOracle = 0.05  # float(sys.argv[1])/n
+pQueryOracle = 0.0005  # 0.01311  # p[0]*(tf+math.sqrt(tf))/(0.5*2*(2*n-1))  # 0.0005  # float(sys.argv[1])/n
 
-thr = 1  # The number of times the oracle is queried
+thr = 10  # The number of times the oracle is queried
 
 mu = [0, 30]  # Mean of the normal distribution
 sigma = [1, 1]  # Standard deviation of the normal distribution

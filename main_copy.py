@@ -12,7 +12,7 @@ import pandas as pd
 import DataVectors
 import functions_copy as fc
 import parameters
-from parameters import ITERATIONS, n, p, q, gSize, pQueryOracle, C, path, nCommunities, mu_bad
+from parameters import ITERATIONS, n, p, q, tf, gSize, pQueryOracle, C, path, nCommunities, mu_bad
 from DataVectors import initialMedian, median, medianOther, times, firstStepValues, secondStepValues
 
 # Suppress future warnings, comment if code not running due to  this
@@ -36,19 +36,23 @@ mc_edges, mc, minDegree, rValues, excessInnerDegree = fc.find_cut(groundG)  # Ob
 listOfNodes = list(groundG)
 
 print(f'n = {n}\n'
-      f'C = {C}\n'
-      f'p = {C} * log(n)/sqrt(n): {[round(i, 4) for i in parameters.p]}\n'
-      f'q = {C} * ((1 - delta) * (n - sqrt(n)) * log(n)) / (n ** (5 / 2)): {round(parameters.q, 4)}\n'
-      f'E[# cut edges] = q * n^2: {round(parameters.q * n**2, 4)}\n'
-      f'The length of the sampled cut |C|: {mc}\n'
-      f'The degrees on the cut {{degree: # nodes}}: {rValues}\n'
-      f'The min degree: {minDegree}\n'
-      f'The r = Pr[query oracle]: {pQueryOracle}')
+      f'n1 = n2 = n\n'
+      f'a = n1/(2n)\n'
+      f'r = Pr[query oracle]: {round(pQueryOracle, 5)} > {round(p[0]*tf/(0.5*2*(2*n-1)), 5)} = p*|F|/((1-a)*2*(2n-1))\n'
+      f'It satisfies p*n*|F| < 2n(2n-1)r(1-a) (E[edges from nodes on the other community] > E[edges to faulty nodes])\n'
+      f'However, it cannot satisfy r*2*n < 1 (r*2*n = {round(pQueryOracle*2*n, 5)})\n'
+      f'c = {C}\n'
+      f'p = {round(parameters.p[0], 4)} -- c * log(n)/sqrt(n)\n'
+      f'q = {round(parameters.q, 4)} -- c * ((1 - delta) * (n - sqrt(n)) * log(n)) / (n ** (5 / 2))\n'
+      f'C = {{e in E: e is xCommunities}} -- F = {{i in V: i faulty}}\n'
+      f'E[|C|] = {round(parameters.q * n ** 2, 4)} -- q * n^2\n'
+      f'Sampled cut |C|: {mc}\n'
+      f'Degrees in the cut: {rValues} -- {{degree: # nodes}}\n'
+      f'Min d: {minDegree}')
 
-tf = int(0.05*n)  # mc  # top faulty nodes
 fn = [tf, tf]  # [math.floor(tf / 2), tf - math.floor(tf / 2)]  # The faulty nodes per community
 
-print(f'The # of faulty nodes = |C|: {2*tf} -- {round((2*tf)/sum(gSize) * 100, 2)} % of total nodes')
+print(f'|F| = |C|: {2 * tf} -- {round((2 * tf) / sum(gSize) * 100, 2)} % of total nodes')
 
 fc.display_graph(groundG, 0, 'Graph', path)
 
@@ -61,11 +65,21 @@ with open(path + 'paramsAndMedians.txt', 'a') as f:
 
 for iteration in range(ITERATIONS):
     G = copy.deepcopy(groundG)
-    print(f'IT: {iteration}\n')
+    # print(f'ITERATION: {iteration}\n')
 
     "Initial Step"
     fn_indices = fc.choose_fn_idx(fn, mc_edges)
     nu, values, G, goodValues = fc.assign_values(G, fn, fn_indices)
+    nn_indices = [[], []]
+    for c in range(nCommunities):
+        for i in list(G):
+            if i not in fn_indices[c]:
+                if i < n:
+                    nn_indices[c] += [i]
+    faultyEdges = fc.count_fn_edges(fn_indices, G)
+    normalEdges = fc.count_nodes_edges(nn_indices, fn_indices, G)
+    print(f'Number faulty edges = |{{d_i: i in F}}|: {faultyEdges}')
+    print(f'Number normal edges = |{{d_i: i in V\F}}|: {[ne/2 for ne in normalEdges]}')
 
     "Save the data"
     if ITERATIONS == 1:
@@ -79,11 +93,11 @@ for iteration in range(ITERATIONS):
     medianOfMedian = fc.mMedian(initialMedian)
 
     "Calculate the potentials"
-    print('Calculate the potentials...')
+    # print('Calculate the potentials...')
     community_potential = fc.get_comm_pot(goodValues, G)
     global_potential = fc.get_glob_pot(values, G, fn_indices)
 
-    print(f'Obtain community median...')
+    # print(f'Obtain community median...')
     condition = list(np.abs(community_potential[0]))
     for c in range(1, nCommunities):
         condition += list(np.abs(community_potential[c]))
@@ -127,7 +141,7 @@ for iteration in range(ITERATIONS):
 
     median.append([fc.mMedian(list(values[i].values())) for i in range(nCommunities)])
 
-    print(f'Obtain the external medians...')
+    # print(f'Obtain the external medians...')
     otherG = G.copy()
     tSecond = 0
     threshold = {}
@@ -136,8 +150,12 @@ for iteration in range(ITERATIONS):
     valsOther = deepcopy(values)
     threshold = deepcopy(median[-1])
 
-    valsOther = fc.update_step(otherG, listOfNodes, valsOther, threshold, goodValsOther,
-                               badValuesIdx, tSecond)
+    valsOther, nEdges, xEdges = fc.update_step(otherG, listOfNodes, valsOther, threshold, goodValsOther,
+                                               badValuesIdx, tSecond)
+
+    print(f'We sampled {nEdges} unique edges')
+    print(f'Of which, {xEdges} are cross cut')
+    print(f'p*n*F = {round(parameters.p[0] * n * tf, 2)} < {round(2*n*(2*n-1)*pQueryOracle*0.5, 2)} = 2n(2n-1)r(1-a)')
 
     "Save the data"
     if ITERATIONS == 1:
@@ -158,9 +176,12 @@ for iteration in range(ITERATIONS):
     while any(condition) > 0.001 and counter < 3 * int(math.log(n)):  # and distanceChange > 0.001:
         temp_b = deepcopy(valsOther),
         goodValsOther, nodeAttr = [], {}
-        valsOther = fc.update_step(otherG, listOfNodes, valsOther, threshold,
-                                   goodValsOther, badValuesIdx, tSecond)
+        valsOther, nEdges, xEdges = fc.update_step(otherG, listOfNodes, valsOther, threshold,
+                                                   goodValsOther, badValuesIdx, tSecond)
 
+        print(f'We sampled {nEdges} unique edges')
+        print(f'Of which, {xEdges} are cross cut')
+        # print(f'p*n*F = {round(parameters.p[0] * n * tf)} > {2*n*(2*n-1)*pQueryOracle*0.5} = 2n(2n-1)r(1-a)')
         community_potential = fc.get_comm_pot(goodValsOther, otherG)
 
         condition = []
@@ -176,12 +197,12 @@ for iteration in range(ITERATIONS):
         tSecond += 1
         counter += 1
 
-    print('External medians obtained.')
+    # print('External medians obtained.')
     medianOther.append([round(fc.mMedian(list(valsOther[i].values())), 3) for i in range(nCommunities)])
     times.append([t, tSecond])
 
-failureIntra = [sum([median[j][k] == mu_bad for j in range(ITERATIONS)])/ITERATIONS for k in range(nCommunities)]
-failureXComm = [sum([medianOther[j][k] == mu_bad for j in range(ITERATIONS)])/ITERATIONS for k in range(nCommunities)]
+failureIntra = [sum([median[j][k] == mu_bad for j in range(ITERATIONS)]) / ITERATIONS for k in range(nCommunities)]
+failureXComm = [sum([medianOther[j][k] == mu_bad for j in range(ITERATIONS)]) / ITERATIONS for k in range(nCommunities)]
 
 times = np.array(times)
 times = np.mean(times, axis=0)
