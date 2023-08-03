@@ -5,7 +5,7 @@ the convergence times in the first and second step.
 
 n of faulty nodes: 40
 N of nodes: [1000, 1000]
-The Minimum degree: 177
-The XCommunity cut size: 173
+The Minimum degree: 179
+The XCommunity cut size: 1016
 
 *********************************************

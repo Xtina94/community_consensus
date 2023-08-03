@@ -8,6 +8,7 @@ from parameters import path
 
 initialMedian = []  # The vector of initial medians
 median = []  # The vector of final medians in first step
+medianRates = []
 medianOther = []  # The vector of final other median in second step
 times = []  # The vector of times for first and second step
 firstStepValues = []  # The values in the network over time for first step
@@ -24,5 +25,7 @@ def create_files():
 
     valuesOverTimeDf = pd.DataFrame(columns=['Comm 0', 'Comm 1'])
     valuesOverTimeDf.to_excel(path + 'Network Values - First Step.xlsx', sheet_name='t0',  index=False)
+    valuesOverTimeDf.to_excel(path + 'Network Ids.xlsx', sheet_name='t0',  index=False)
     valuesOverTimeDf.to_excel(path + 'Network Values - Second Step.xlsx', sheet_name='t0',  index=False)
     valuesOverTimeDf.to_excel(path + 'Network Tokens - First Step.xlsx', sheet_name='t0',  index=False)
+    valuesOverTimeDf.to_excel(path + 'Community size rates.xlsx', sheet_name='t0', index=False)
