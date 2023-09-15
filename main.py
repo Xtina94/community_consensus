@@ -10,7 +10,7 @@ from copy import deepcopy
 import pandas as pd
 
 import DataVectors
-import functions_copy as fc
+import functions as fc
 import parameters
 from parameters import ITERATIONS, n, p, q, tf, gSize, pQueryOracle, C, path, nCommunities, mu_bad
 from DataVectors import initialMedian, median, medianOther, times, firstStepValues, secondStepValues
@@ -54,7 +54,7 @@ fn = [tf, tf]  # [math.floor(tf / 2), tf - math.floor(tf / 2)]  # The faulty nod
 
 print(f'|F| = |C|: {2 * tf} -- {round((2 * tf) / sum(gSize) * 100, 2)} % of total nodes')
 
-fc.display_graph(groundG, 0, 'Graph', path)
+# fc.display_graph(groundG, 0, 'Graph', path)
 
 with open(path + 'paramsAndMedians.txt', 'a') as f:
     f.write(f'n of faulty nodes: {tf}'
