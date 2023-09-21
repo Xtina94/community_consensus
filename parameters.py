@@ -5,7 +5,7 @@ import numpy as np
 path = './Outputs/'
 BORDER_NODES_OPTION = 1
 ITERATIONS = 1
-OLD = 1  #flag to compare a 2 phase algo with a 3 phase algo
+OLD = 0  #flag to compare a 2 phase algo with a 3 phase algo. When OLD == 1, then it applies a 3 phase algo
 n = 1000  # previously 1000
 C = 1  # previously 7  # The suitable large constant for the probabilities of forming edges
 gSize = [n, n]

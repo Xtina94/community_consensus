@@ -2,105 +2,163 @@ import copy
 import math
 import os
 import random
+import shutil
 import statistics
+import sys
 import warnings
 
+import matplotlib
+import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-from copy import deepcopy
-
 import pandas as pd
 
-import DataVectors
-import functions as fc
-import parameters
-from parameters import ITERATIONS, n, p, q, tf, gSize, pQueryOracle, C, path, nCommunities, mu_bad
-from DataVectors import initialMedian, median, medianOther, times, firstStepValues, secondStepValues
+
+path = './Outputs/'
 
 # Suppress future warnings, comment if code not running due to  this
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+
+def clean_fldr():
+    folder = path
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print('Failed to delete %s. Reason: %s' % (file_path, e))
+
+
 "Clean the output folder"
 if os.path.exists(path):
-    fc.clean_fldr()
+    clean_fldr()
 else:
     os.makedirs(path)
 
-"Create the files to save the data to"
-DataVectors.create_files()
-
 "Set up the graph"
-
+DEALBREAKER = 0  # Flag to indicate that something is wrong:
+                    # 0 -- All conditions are respected and the algorithm should lead to community consensus
+                    # 1 -- if the minimum degree is not respected but the graph is excess robust
+                    # 2 -- if the graph is not (0, f + 1)- excess robust but the minimum degree is respected
 # G is the merge of two complete graphs of size (n-1)/2, (n+1)/2 each
-f = 3
-n1 = 3*f + 1  # It respects d1 >= 2f + 3
-n2 = 4*f  # It respects d2 >= 2f + 3
+if DEALBREAKER == 2:
+    f = [6, 1]
+else:
+    f = [6, 3]
+
+n1 = 2 * f[0] + 2 + 1 + 1  # It respects d1 >= 2f + 3
+n2 = 2 * f[1] + 2 + 1 + 1 + 2  # It respects d2 >= 2f + 3 (2f + k + 1 + 1 since this is the requirement for the degree)
+print(f'Good nodes in community 1: {n1 - f[0]} \nGood nodes in community 2: {n2 - f[1]} '
+      f'\nFaulty nodes in Community 1: {f[0]} \nFaulty nodes in Community 2: {f[1]}')
 k = 2
-b = 100  # The bad value of the faulty nodes
+b = 300  # The bad value of the faulty nodes
 c = 2  # Number of communities
-mu, sigma = [0, 30], [1, 1]
+mu, sigma = [0, 60], [1, 1]
+print(f'# Nodes: {n1 + n2}')
 
 G1 = nx.complete_graph(n1)
 G2 = nx.complete_graph(n2)
+if DEALBREAKER == 1:  # remove n/3 matchings, the min degree is not respected anymore, but the graph is still robust
+    tmp = list(G1)
+    for i in range(int(len(list(G1))/10)):
+        nds = random.sample(tmp, 2)
+        G1.remove_edge(nds[0], nds[1])
+        tmp.remove(nds[0])
+        tmp.remove(nds[1])
+elif DEALBREAKER == 2:  # remove many edges. The min degree is maintained but the graph is not robust anymore
+    G2.remove_edge(0, 3)
+    G2.remove_edge(0, 4)
+    G2.remove_edge(0, 5)
+    G2.remove_edge(0, 6)
+    G2.remove_edge(1, 2)
+    G2.remove_edge(1, 3)
+    G2.remove_edge(1, 4)
+    G2.remove_edge(1, 5)
+    G2.remove_edge(2, 6)
+    G2.remove_edge(2, 7)
+    G2.remove_edge(3, 6)
+    G2.remove_edge(3, 7)
+    G2.remove_edge(4, 6)
+    G2.remove_edge(4, 7)
+    # tmp = list(G2)
+    # start = random.sample(tmp, 1)[0]
+    # tmp.remove(start)
+    # nds = random.sample(tmp, 4)
+    # for i in range(4):
+    #     G2.remove_edge(start, nds[i])
 G = nx.disjoint_union(G1, G2)
+
 nodes = list(G)
-print(nodes)
 nodes_comm, ln_indices = [], []
 nodes_comm.append([nodes[i] for i in range(n1)])
 nodes_comm.append([nodes[i + n1] for i in range(n2)])
-print(f'Nodes comm: {nodes_comm}')
-# nodes1 = [nodes[i] for i in range(n1)]
-# nodes2 = [nodes[n1 + i] for i in range(n2)]
-p_edge = 0.9
+p_edge = 1
 tmp = 2 * np.ones(n1 + n2)
 strikes = np.array([nodes, tmp])
 alpha = 0.5
-fn_indices = random.sample(nodes_comm[0], f) + random.sample(nodes_comm[1], f)
+
+fn_indices = random.sample(nodes_comm[0], f[0]) + random.sample(nodes_comm[1], f[1])
 print(f'fn indices: {fn_indices}')
 for j in range(c):
     ln_indices = ln_indices + [i for i in nodes_comm[j] if i not in fn_indices]
-print(f'ln Indices: {ln_indices}')
-# ln_indices = [i for i in nodes if i not in fn_indices]
 fn_values = {i: b for i in fn_indices}
 ln_values = {i: 0 for i in ln_indices}
-values = fn_values | ln_values
-print(f'ln values: {ln_values}')
-print(f'values: {values}')
 
-# Establish the connections among two communities
-for i in nodes_comm[1]:
-    temp = random.sample(nodes_comm[1], k)
-    # print(f'Starting: {i}')
-    # print(f'Destinations: {temp}')
-    for t in temp:
-        if strikes[1, t] and strikes[1, i]:  # Add edge only if there have not been added 2 edges to the node already
-            edge_placed = np.random.binomial(1, p_edge, 1)[0]
-            # print('Before')
-            # print(strikes[:, t])
-            # print(strikes[:, i])
-            if edge_placed:
-                # print('Placing edge')
-                G.add_edge(i, t)
-                strikes[1, i] = strikes[1, i] - 1
-                strikes[1, t] = strikes[1, t] - 1
-                # print('After')
-                # print(strikes[:, t])
-                # print(strikes[:, i])
+
+# Add k edges per agent to connect the two communities
+try:
+    # Establish the connections among two communities
+    for i in nodes_comm[1]:
+        temp = random.sample(nodes_comm[0], k)
+        for t in temp:
+            if strikes[1, t] > 0 and strikes[1, i] > 0:  # Add edge only if there have not been added 2 edges to the node already
+                edge_placed = np.random.binomial(1, p_edge, 1)[0]
+                if edge_placed:
+                    G.add_edge(i, t)
+                    strikes[1, i] = strikes[1, i] - 1
+                    strikes[1, t] = strikes[1, t] - 1
+                    # Check that no edge is selected twice
+                    if strikes[1, i] < 0 or strikes[1, t] < 0:
+                        raise Exception(f'More than k edges departing from {i} or possibly from {t}')
+except Exception as inst:
+    print(inst.args)
+    sys.exit()
 
 # Assign the values to the legitimate nodes
 tmp = []
 for j in range(c):
-    tmp = tmp + list(np.random.normal(mu[j], sigma[j], size=len(nodes_comm[j])))
+    tmp = tmp + list(np.random.normal(mu[j], sigma[j], size=len(nodes_comm[j]) - f[j]))
+tmp = [round(i, 4) for i in tmp]
 print(f'The values to assign: {tmp}')
 for i in ln_indices:
-    ln_values[i] = tmp.pop()
+    ln_values[i] = tmp.pop(0)
 
-print(f'The assigned ln values: {ln_values}')
+values = fn_values | ln_values
+valuesDf = pd.DataFrame(values.items(), columns=['Node', 'Value'])
+valuesDf = valuesDf.explode('Value')
+values_comm = []
+for i in range(c):
+    values_comm.append({j: values[j] for j in nodes_comm[i]})
 
-# Apply MCA
+
+def display_graph(mG, vs, mString):
+    pos = nx.spring_layout(mG, seed=4)
+    temp = {i: round(vs[i], 2) for i in vs.keys()}
+    colors = list(vs.values())
+    color_map = plt.get_cmap('GnBu')  # cm.GnBu
+    color_map = [color_map(1. * i / (len(list(mG)))) for i in range(len(list(mG)))]
+    color_map = matplotlib.colors.ListedColormap(color_map, name='faulty_nodes_cm')
+    nx.draw(mG, pos=pos, node_color=colors, labels=temp, cmap=color_map, node_size=600)
+    mStr = f'{mString}.png'
+    plt.savefig(path + mStr, format='png')
+    plt.close()
 
 
-def update_step(vs):
+def update_step(vs, vsDf):
     tmp = copy.copy(vs)
     for i in ln_indices:
         neigh = list(G.adj[i])
@@ -109,198 +167,20 @@ def update_step(vs):
         m = statistics.median(neigh_val)
         tmp[i] = alpha * vs[i] + (1 - alpha) * m
     vs = tmp
-    return  vs
+    tmpDf = pd.DataFrame(vs.items(), columns=['Nodes', 't > 0'])
+    tmpDf = tmpDf.explode('t > 0')
+    vsDf = pd.concat([vsDf, tmpDf['t > 0']], axis=1)
+    return vs, vsDf
 
-
+# Apply MCA
 t = 0
-while t < 30*math.log(len(nodes)):
-    values = update_step(values)
+print('Starting updates...')
+display_graph(G, values, 'graph')
+while t < 30 * math.log(len(nodes)):
+    values, valuesDf = update_step(values, valuesDf)
+    t += 1
+
+display_graph(G, values, 'graph_final')
 
 print(f'The final values: {values}')
-
-# # G is generated through a stochastic block model
-# probs = [[p[0], q], [q, p[1]]]  # TODO make it robust to multiple communities
-# groundG = nx.stochastic_block_model(gSize, probs, seed=65)  # Generate graph
-# mc_edges, mc, minDegree, rValues, excessInnerDegree = fc.find_cut(groundG)  # Obtain the edges of the inter-blocks cut
-# listOfNodes = list(groundG)
-#
-# print(f'n = {n}\n'
-#       f'n1 = n2 = n\n'
-#       f'a = n1/(2n)\n'
-#       f'r = Pr[query oracle]: {round(pQueryOracle, 5)} > {round(p[0]*tf/(0.5*2*(2*n-1)), 5)} = p*|F|/((1-a)*2*(2n-1))\n'
-#       f'It satisfies p*n*|F| < 2n(2n-1)r(1-a) (E[edges from nodes on the other community] > E[edges to faulty nodes])\n'
-#       f'However, it cannot satisfy r*2*n < 1 (r*2*n = {round(pQueryOracle*2*n, 5)})\n'
-#       f'c = {C}\n'
-#       f'p = {round(parameters.p[0], 4)} -- c * log(n)/sqrt(n)\n'
-#       f'q = {round(parameters.q, 4)} -- c * ((1 - delta) * (n - sqrt(n)) * log(n)) / (n ** (5 / 2))\n'
-#       f'C = {{e in E: e is xCommunities}} -- F = {{i in V: i faulty}}\n'
-#       f'E[|C|] = {round(parameters.q * n ** 2, 4)} -- q * n^2\n'
-#       f'Sampled cut |C|: {mc}\n'
-#       f'Degrees in the cut: {rValues} -- {{degree: # nodes}}\n'
-#       f'Min d: {minDegree}')
-#
-# fn = [tf, tf]  # [math.floor(tf / 2), tf - math.floor(tf / 2)]  # The faulty nodes per community
-#
-# print(f'|F| = |C|: {2 * tf} -- {round((2 * tf) / sum(gSize) * 100, 2)} % of total nodes')
-#
-# # fc.display_graph(groundG, 0, 'Graph', path)
-#
-# with open(path + 'paramsAndMedians.txt', 'a') as f:
-#     f.write(f'n of faulty nodes: {tf}'
-#             f'\nN of nodes: {parameters.gSize}'
-#             f'\nThe Minimum degree: {minDegree}'
-#             f'\nThe XCommunity cut size: {mc}\n'
-#             f'\n*********************************************\n')
-#
-# for iteration in range(ITERATIONS):
-#     G = copy.deepcopy(groundG)
-#     # print(f'ITERATION: {iteration}\n')
-#
-#     "Initial Step"
-#     fn_indices = fc.choose_fn_idx(fn, mc_edges)
-#     nu, values, G, goodValues = fc.assign_values(G, fn, fn_indices)
-#     nn_indices = [[], []]
-#     for c in range(nCommunities):
-#         for i in list(G):
-#             if i not in fn_indices[c]:
-#                 if i < n:
-#                     nn_indices[c] += [i]
-#     faultyEdges = fc.count_fn_edges(fn_indices, G)
-#     normalEdges = fc.count_nodes_edges(nn_indices, fn_indices, G)
-#     print(f'Number faulty edges = |{{d_i: i in F}}|: {faultyEdges}')
-#     print(f'Number normal edges = |{{d_i: i in V\F}}|: {[ne/2 for ne in normalEdges]}')
-#
-#     "Save the data"
-#     if ITERATIONS == 1:
-#         fc.save_data(values, 'Network Values - First Step.xlsx', 0)
-#
-#     "Calculate the initial median"
-#     initialMedian.append([fc.mMedian(list(values[i].values())) for i in range(nCommunities)])
-#     l = {}
-#     [l.update(values[i]) for i in range(nCommunities)]
-#     medianTotal = fc.mMedian(list(l.values()))
-#     medianOfMedian = fc.mMedian(initialMedian)
-#
-#     "Calculate the potentials"
-#     # print('Calculate the potentials...')
-#     community_potential = fc.get_comm_pot(goodValues, G)
-#     global_potential = fc.get_glob_pot(values, G, fn_indices)
-#
-#     # print(f'Obtain community median...')
-#     condition = list(np.abs(community_potential[0]))
-#     for c in range(1, nCommunities):
-#         condition += list(np.abs(community_potential[c]))
-#
-#     t, counter = 1, 0
-#     badValuesIdx = fn_indices[0]
-#     for c in range(nCommunities):
-#         badValuesIdx += fn_indices[c]
-#     while any(condition) > 0.001 and counter < 30 * int(math.log(n)):  # and distanceChange > 0.001:
-#         temp, nodeAttr = copy.deepcopy(values), {}  # TODO check this deepcopy, please let it be non influential
-#         for x in list(G):
-#             neighVals = []
-#             if x not in badValuesIdx:
-#                 neighbors = list(G.adj[x])
-#                 for c in range(nCommunities):
-#                     neighVals += [values[c][j] for j in neighbors if j in values[c].keys()]
-#                 for c in range(nCommunities):
-#                     if x in values[c].keys():
-#                         med = fc.mMedian(neighVals)
-#                         temp[c].update({x: med})
-#                         goodValues[c].update({x: med})
-#         for c in range(nCommunities):
-#             nodeAttr.update(temp[c])
-#         nx.set_node_attributes(G, nodeAttr, 'Values')
-#
-#         values = temp
-#
-#         # Update potentials
-#         community_potential = fc.get_comm_pot(goodValues, G)
-#
-#         condition = []
-#         for c in range(nCommunities):
-#             condition += list(np.abs(community_potential[c]))
-#
-#         "Save the data"
-#         if ITERATIONS == 1:
-#             fc.save_data(values, 'Network Values - First Step.xlsx', t)
-#
-#         t += 1
-#         counter += 1
-#
-#     median.append([fc.mMedian(list(values[i].values())) for i in range(nCommunities)])
-#
-#     # print(f'Obtain the external medians...')
-#     otherG = G.copy()
-#     tSecond = 0
-#     threshold = {}
-#
-#     goodValsOther, nodeAttr = [], {}
-#     valsOther = deepcopy(values)
-#     threshold = deepcopy(median[-1])
-#
-#     valsOther, nEdges, xEdges = fc.update_step(otherG, listOfNodes, valsOther, threshold, goodValsOther,
-#                                                badValuesIdx, tSecond)
-#
-#     print(f'We sampled {nEdges} unique edges')
-#     print(f'Of which, {xEdges} are cross cut')
-#     print(f'p*n*F = {round(parameters.p[0] * n * tf, 2)} < {round(2*n*(2*n-1)*pQueryOracle*0.5, 2)} = 2n(2n-1)r(1-a)')
-#
-#     "Save the data"
-#     if ITERATIONS == 1:
-#         fc.save_data(valsOther, 'Network Values - Second Step.xlsx', 0)
-#
-#     tSecond += 1
-#
-#     community_potential = fc.get_comm_pot(goodValsOther, otherG)
-#
-#     condition = []
-#     for c in range(nCommunities):
-#         condition += list(np.abs(community_potential[c]))
-#         nodeAttr.update(valsOther[c])
-#
-#     nx.set_node_attributes(otherG, nodeAttr, 'Values')
-#
-#     counter = 0
-#     while any(condition) > 0.001 and counter < 3 * int(math.log(n)):  # and distanceChange > 0.001:
-#         temp_b = deepcopy(valsOther),
-#         goodValsOther, nodeAttr = [], {}
-#         valsOther, nEdges, xEdges = fc.update_step(otherG, listOfNodes, valsOther, threshold,
-#                                                    goodValsOther, badValuesIdx, tSecond)
-#
-#         print(f'We sampled {nEdges} unique edges')
-#         print(f'Of which, {xEdges} are cross cut')
-#         # print(f'p*n*F = {round(parameters.p[0] * n * tf)} > {2*n*(2*n-1)*pQueryOracle*0.5} = 2n(2n-1)r(1-a)')
-#         community_potential = fc.get_comm_pot(goodValsOther, otherG)
-#
-#         condition = []
-#         for c in range(nCommunities):
-#             condition += list(np.abs(community_potential[c]))
-#             nodeAttr.update(valsOther[c])
-#         nx.set_node_attributes(otherG, nodeAttr, 'Values')
-#
-#         "Save the data"
-#         if ITERATIONS == 1:
-#             fc.save_data(valsOther, 'Network Values - Second Step.xlsx', tSecond)
-#
-#         tSecond += 1
-#         counter += 1
-#
-#     # print('External medians obtained.')
-#     medianOther.append([round(fc.mMedian(list(valsOther[i].values())), 3) for i in range(nCommunities)])
-#     times.append([t, tSecond])
-#
-# failureIntra = [sum([median[j][k] == mu_bad for j in range(ITERATIONS)]) / ITERATIONS for k in range(nCommunities)]
-# failureXComm = [sum([medianOther[j][k] == mu_bad for j in range(ITERATIONS)]) / ITERATIONS for k in range(nCommunities)]
-#
-# times = np.array(times)
-# times = np.mean(times, axis=0)
-# times = [round(i, 3) for i in times]
-#
-# print('Save failure rates')
-# with open(path + 'paramsAndMedians.txt', 'a') as f:
-#     f.write(f'The failure rate 1st step: {failureIntra}\n')
-#     f.write(f'The failure rate 2nd step: {failureXComm}\n')
-#     f.write(f'The average times: {times}')
-#
-# print('Done.')
+valuesDf.to_csv(path + 'values.csv', index=False)
