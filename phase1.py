@@ -51,14 +51,20 @@ DEALBREAKER = 0  # Flag to indicate that something is wrong:
 
 plotTitle = ''
 if DEALBREAKER == 2:
+    random.seed(1)
+    np.random.seed(1)
     f = [6, 1]
 else:
+    random.seed(8)
+    np.random.seed(8)
     f = [6, 3]
 
 n1 = 2 * f[0] + 2 + 1 + 1  # It respects d1 >= 2f + 3
 n2 = 2 * f[1] + 2 + 1 + 1 + 2  # It respects d2 >= 2f + 3 (2f + k + 1 + 1 since this is the requirement for the degree)
 
 if not DEALBREAKER:
+    random.seed(10)
+    np.random.seed(10)
     f = [20, 10]
     n1 = 6 * f[0] + 2 + 1 + 1  # It respects d1 >= 2f + 3
     n2 = 3 * f[1] + 2 + 1 + 1 + 2  # It respects d2 >= 2f + 3 (2f + k + 1 + 1 since this is the requirement for the degree)
@@ -126,41 +132,40 @@ strikes = np.array([nodes, tmp])
 alpha = 0.6
 
 WRITEIDX = 1
-if WRITEIDX:
-    fn_indices = random.sample(nodes_comm[0], f[0]) + random.sample(nodes_comm[1], f[1])
-    fn_indicesDf = pd.DataFrame(fn_indices)
-    fn_indicesDf.to_csv('./fnIndices.csv', index=False)
+fn_indices = random.sample(nodes_comm[0], f[0]) + random.sample(nodes_comm[1], f[1])
+# fn_indicesDf = pd.DataFrame(fn_indices)
+# fn_indicesDf.to_csv('./fnIndices.csv', index=False)
 
-    # Add k edges per agent to connect the two communities
-    try:
-        # Establish the connections among two communities
-        edgesList = []
-        for i in nodes_comm[1]:
-            temp = random.sample(nodes_comm[0], k)
-            for t in temp:
-                if strikes[1, t] > 0 and strikes[
-                    1, i] > 0:  # Add edge only if there have not been added 2 edges to the node already
-                    edge_placed = np.random.binomial(1, p_edge, 1)[0]
-                    if edge_placed:
-                        # G.add_edge(i, t)
-                        edgesList.append((i, t))
-                        strikes[1, i] = strikes[1, i] - 1
-                        strikes[1, t] = strikes[1, t] - 1
-                        # Check that no edge is selected twice
-                        if strikes[1, i] < 0 or strikes[1, t] < 0:
-                            raise Exception(f'More than k edges departing from {i} or possibly from {t}')
-    except Exception as inst:
-        print(inst.args)
-        sys.exit()
+# Add k edges per agent to connect the two communities
+try:
+    # Establish the connections among two communities
+    edgesList = []
+    for i in nodes_comm[1]:
+        temp = random.sample(nodes_comm[0], k)
+        for t in temp:
+            if strikes[1, t] > 0 and strikes[
+                1, i] > 0:  # Add edge only if there have not been added 2 edges to the node already
+                edge_placed = np.random.binomial(1, p_edge, 1)[0]
+                if edge_placed:
+                    G.add_edge(i, t)
+                    # edgesList.append((i, t))
+                    strikes[1, i] = strikes[1, i] - 1
+                    strikes[1, t] = strikes[1, t] - 1
+                    # Check that no edge is selected twice
+                    if strikes[1, i] < 0 or strikes[1, t] < 0:
+                        raise Exception(f'More than k edges departing from {i} or possibly from {t}')
+except Exception as inst:
+    print(inst.args)
+    sys.exit()
 
-    edgesListDf = pd.DataFrame(edgesList)
-    edgesListDf.to_csv('./edgesList.csv', index=False)
-else:
-    fn_indices = pd.read_csv('./fnIndices.csv')
-    fn_indices = list(fn_indices.iloc[:, 0])
-    edgesList = pd.read_csv('./edgesList.csv')
-    for e in range(len(edgesList)):
-        G.add_edge(edgesList.iloc[e, 0], edgesList.iloc[e, 1])
+# edgesListDf = pd.DataFrame(edgesList)
+# edgesListDf.to_csv('./edgesList.csv', index=False)
+# else:
+#     fn_indices = pd.read_csv('./fnIndices.csv')
+#     fn_indices = list(fn_indices.iloc[:, 0])
+#     edgesList = pd.read_csv('./edgesList.csv')
+#     for e in range(len(edgesList)):
+#         G.add_edge(edgesList.iloc[e, 0], edgesList.iloc[e, 1])
 
 print(f'fn indices: {fn_indices}')
 for j in range(c):
@@ -168,30 +173,29 @@ for j in range(c):
 fn_values = {i: badVal for i in fn_indices}
 ln_values = {i: 0 for i in ln_indices}
 
-if WRITEIDX:
-    # Assign the values to the legitimate nodes
-    tmp = []
-    for j in range(c):
-        tmp = tmp + list(np.random.normal(mu[j], sigma[j], size=len(nodes_comm[j]) - f[j]))
-    tmp = [round(i, 4) for i in tmp]
-    print(f'The values to assign: {tmp}')
-    for i in ln_indices:
-        ln_values[i] = tmp.pop(0)
+# Assign the values to the legitimate nodes
+tmp = []
+for j in range(c):
+    tmp = tmp + list(np.random.normal(mu[j], sigma[j], size=len(nodes_comm[j]) - f[j]))
+tmp = [round(i, 4) for i in tmp]
+print(f'The values to assign: {tmp}')
+for i in ln_indices:
+    ln_values[i] = tmp.pop(0)
 
-    values = fn_values | ln_values
-    valuesDf = pd.DataFrame(values.items(), columns=['Node', 'Value'])
-    valuesDf = valuesDf.explode('Value')
-    valuesDf.to_csv('./values.csv', index=False)
-else:
-    valuesDf = pd.read_csv('./values.csv')
-    values = {}
-    tmpNode = list(valuesDf['Node'])
-    tmpVal = list(valuesDf['Value'])
-    for i in range(len(tmpNode)):
-        values[tmpNode[i]] = tmpVal[i]
-    values_comm = []
-    for i in range(c):
-        values_comm.append({j: values[j] for j in nodes_comm[i]})
+values = fn_values | ln_values
+valuesDf = pd.DataFrame(values.items(), columns=['Node', 'Value'])
+valuesDf = valuesDf.explode('Value')
+# valuesDf.to_csv('./values.csv', index=False)
+# else:
+#     valuesDf = pd.read_csv('./values.csv')
+#     values = {}
+#     tmpNode = list(valuesDf['Node'])
+#     tmpVal = list(valuesDf['Value'])
+#     for i in range(len(tmpNode)):
+#         values[tmpNode[i]] = tmpVal[i]
+values_comm = []
+for i in range(c):
+    values_comm.append({j: values[j] for j in nodes_comm[i]})
 
 
 def display_graph(mG, vs, mString):
