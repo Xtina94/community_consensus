@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 
-path = './Outputs/'
+path = '../Outputs/'
 
 # Suppress future warnings, comment if code not running due to  this
 warnings.simplefilter(action='ignore', category=FutureWarning)
